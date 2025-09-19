@@ -4,7 +4,7 @@ pub fn build(b: *std.build.Builder) !void {
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
 
-    const exe = b.addExecutable("bedrock-finder", "src/main.zig");
+    const exe = b.addExecutable("PatternLocatorX", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
@@ -18,7 +18,7 @@ pub fn build(b: *std.build.Builder) !void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const wasm = b.addSharedLibrary("bedrock-finder", "src/web.zig", .unversioned);
+    const wasm = b.addSharedLibrary("PatternLocatorX", "src/web.zig", .unversioned);
     wasm.setTarget(try std.zig.CrossTarget.parse(.{
         .arch_os_abi = "wasm32-freestanding",
     }));
