@@ -25,6 +25,7 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - The search height is automatically set based on dimension.
 - Patterns are saved in the `Pattern-log` directory for reuse.
 - 1.18+ only
+- DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs)
 
 ## License
 This project is released under the MIT License. See `LICENSE` for details.
