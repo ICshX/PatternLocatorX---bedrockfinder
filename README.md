@@ -29,3 +29,16 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 
 ## License
 This project is released under the MIT License. See `LICENSE` for details.
+
+## Keywords
+Minecraft bedrock pattern finder
+Bedrock-Pattern Locator
+Minecraft world coordinates
+seed based bedrock pattern search
+Overworld bedrock scanner
+Nether bedrock ceiling/floor locator
+Zig programming Minecraft tool
+Bedrock Finder 1.18+
+Custom bedrock pattern input
+multi-directional pattern scanning Minecraft
+PatternLocatorX
