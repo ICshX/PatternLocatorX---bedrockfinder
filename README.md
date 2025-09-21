@@ -42,3 +42,5 @@ Bedrock Finder 1.18+
 Custom bedrock pattern input
 multi-directional pattern scanning Minecraft
 PatternLocatorX
+
+<meta name="google-site-verification" content="vSH4KdsXubLDPWRgTitNpkl1WcjrfdOBL76Jm34UO-A" />
