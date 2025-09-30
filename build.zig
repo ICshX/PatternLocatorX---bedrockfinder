@@ -1,6 +1,7 @@
 //-----------------------------------------------
 // Original: Copyright (c) 2022 silver
 // Modifications: Copyright (c) 2025 ICshX
+// Licensed under the MIT License – see LICENSE
 //-----------------------------------------------
 const std = @import("std");
 
