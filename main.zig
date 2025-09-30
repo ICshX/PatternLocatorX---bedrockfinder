@@ -1,3 +1,6 @@
+//-----------------------------------------------
+// Original: Copyright (c) 2025 ICshX
+//-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
 
