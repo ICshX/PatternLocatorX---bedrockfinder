@@ -1,8 +1,18 @@
-//------------------------------------
-// Original: Copyright (c) 2025 ICshX
-//------------------------------------
+:: -----------------------------------------------
+::  Copyright (c) 2025 ICshX
+::  Licensed under the MIT License – see LICENSE
+:: -----------------------------------------------
 @echo off 
 SETLOCAL ENABLEDELAYEDEXPANSION
+
+echo -------------------------------------------------
+echo  Copyright (c) 2025 ICshX
+echo -------------------------------------------------
+echo  If you modify and redistribute this script,
+echo  please credit/tag ICshX as the original author.
+echo -------------------------------------------------
+echo  Licensed under the MIT License - see LICENSE
+echo -------------------------------------------------
 
 REM ================= Default values =================
 set "SEED=0"
@@ -41,7 +51,7 @@ if not exist "%ZIGPATH%" (
 )
 
 REM ================= Ask for parameters =================
-echo Enter Seed [Use SeedcrackerX to find out the seed on servers] (default: %SEED%):
+echo Enter Seed [Use SeedcrackerX to find out the seed on servers] (last: %SEED%):
 set /p USERSEED=
 if not "!USERSEED!"=="" set "SEED=!USERSEED!"
 
@@ -138,10 +148,10 @@ echo Dimension: %USERDIM%
 echo Directions: %USERDIRS%
 
 if defined PATTERNFILE (
-    REM Reihenfolge: Seed, Range, Dimension, Pattern-Datei, Directions
+    REM Arrangement: Seed, Range, Dimension, Pattern-Datei, Directions
     "%ZIGPATH%" run main.zig -O ReleaseFast -- %SEED% %RANGE% "%PATTERNFILE%" "%USERDIRS%" %USERDIM%
 ) else (
-    REM Reihenfolge: Seed, Range, Dimension, Directions (ohne Pattern-Datei)
+    REM Arrangement: Seed, Range, Dimension, Directions (Without Pattern-file)
     "%ZIGPATH%" run main.zig -O ReleaseFast -- %SEED% %RANGE% "%USERDIRS%" %USERDIM%
 )
 
