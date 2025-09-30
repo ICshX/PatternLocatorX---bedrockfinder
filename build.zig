@@ -1,3 +1,7 @@
+//-----------------------------------------------
+// Original: Copyright (c) 2022 silver
+// Modifications: Copyright (c) 2025 ICshX
+//-----------------------------------------------
 const std = @import("std");
 
 pub fn build(b: *std.build.Builder) !void {
