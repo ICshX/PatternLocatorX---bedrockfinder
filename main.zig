@@ -1,5 +1,6 @@
 //-----------------------------------------------
-// Original: Copyright (c) 2025 ICshX
+// Copyright (c) 2025 ICshX
+// Licensed under the MIT License – see LICENSE
 //-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
