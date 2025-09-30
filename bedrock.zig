@@ -1,3 +1,7 @@
+//-----------------------------------------------
+// Original: Copyright (c) 2022 silver
+// Modifications: Copyright (c) 2025 ICshX
+//-----------------------------------------------
 const std = @import("std");
 
 pub const PatternFinder = struct {
