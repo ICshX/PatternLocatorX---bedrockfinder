@@ -1,3 +1,6 @@
+//------------------------------------
+// Original: Copyright (c) 2025 ICshX
+//------------------------------------
 @echo off 
 SETLOCAL ENABLEDELAYEDEXPANSION
 
