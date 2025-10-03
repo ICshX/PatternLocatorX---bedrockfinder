@@ -4,6 +4,9 @@
 //-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
+const Thread = std.Thread;
+const Mutex = std.Thread.Mutex;
+const Atomic = std.atomic.Atomic;
 
 // Pattern struct for flexible sizes
 const FlexiblePattern = struct {
@@ -97,6 +100,34 @@ fn formatDuration(seconds: f64) void {
     }
 }
 
+// Thread task structure
+const ThreadTask = struct {
+    start_x: i32,
+    end_x: i32,
+    start_z: i32,
+    end_z: i32,
+    height_range: HeightRange,
+    generator: bedrock.GradientGenerator,
+    pattern: []const []const []const ?bedrock.Block,
+    ctx: *SearchContext,
+};
+
+// Thread worker function
+fn searchWorker(task: ThreadTask) void {
+    var finder = bedrock.PatternFinder{
+        .gen = task.generator,
+        .pattern = task.pattern,
+    };
+
+    finder.search(
+        .{ .x = task.start_x, .y = task.height_range.start_y, .z = task.start_z },
+        .{ .x = task.end_x, .y = task.height_range.end_y, .z = task.end_z },
+        task.ctx,
+        reportResult,
+        reportProgressThreaded,
+    );
+}
+
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -116,7 +147,7 @@ pub fn main() anyerror!void {
         return error.NotEnoughArgs;
     };
 
-    // optional: pattern_file, dirs, dimension (handle order)
+    // optional: pattern_file, dirs, dimension
     const pattern_file_path = args.next();
     const dirs_arg = args.next() orelse "all";
     const dim_arg = args.next() orelse "overworld";
@@ -124,7 +155,11 @@ pub fn main() anyerror!void {
     const seed = try std.fmt.parseInt(i64, seed_str, 10);
     const range = try std.fmt.parseInt(i32, range_str, 10);
 
-    // Danach Generator erstellen
+    // Get number of CPU cores, limit to 8 for better chunk sizes
+    var num_threads = try Thread.getCpuCount();
+    if (num_threads > 8) num_threads = 8;
+
+    // Generator erstellen
     var generator: bedrock.GradientGenerator = undefined;
     if (std.mem.eql(u8, dim_arg, "overworld")) {
         generator = bedrock.GradientGenerator.overworldFloor(seed);
@@ -140,7 +175,7 @@ pub fn main() anyerror!void {
     // Load pattern: either from file or default
     var pattern: FlexiblePattern = undefined;
     if (pattern_file_path) |pf| {
-        var contents = try std.fs.cwd().readFileAlloc(allocator, pf, 10 * 1024 * 1024); // 10 MB Limit
+        var contents = try std.fs.cwd().readFileAlloc(allocator, pf, 10 * 1024 * 1024);
         defer allocator.free(contents);
 
         var lines_list = std.ArrayList([]const u8).init(allocator);
@@ -151,17 +186,14 @@ pub fn main() anyerror!void {
         while (i <= contents.len) : (i += 1) {
             if (i == contents.len or contents[i] == '\n') {
                 var line = contents[start..i];
-                // Trim CR if present
                 if (line.len > 0 and line[line.len - 1] == '\r') {
                     line = line[0..line.len - 1];
                 }
-                // Skip empty lines
                 if (line.len > 0) try lines_list.append(line);
                 start = i + 1;
             }
         }
 
-        // create pattern from the lines
         pattern = try createPatternFromString(allocator, lines_list.items[0..lines_list.items.len]);
     } else {
         const default_pattern = [_][]const u8{
@@ -176,12 +208,39 @@ pub fn main() anyerror!void {
     // Determine search height range based on dimension
     const height_range = getHeightRange(dim_arg);
 
+    // Convert directions argument to readable format
+    const dirs_display = blk: {
+        if (std.mem.eql(u8, dirs_arg, "all")) {
+            break :blk "North, East, South, West";
+        } else {
+            var display_list = std.ArrayList(u8).init(allocator);
+            
+            for (dirs_arg) |c| {
+                if (c == ' ' or c == ',') continue;
+                if (display_list.items.len > 0) {
+                    try display_list.appendSlice(", ");
+                }
+                switch (c) {
+                    'N' => try display_list.appendSlice("North"),
+                    'E' => try display_list.appendSlice("East"),
+                    'S' => try display_list.appendSlice("South"),
+                    'W' => try display_list.appendSlice("West"),
+                    else => {},
+                }
+            }
+            break :blk display_list.items;
+        }
+    };
+
     // Print header + pattern
     std.debug.print("\n===========================================\n", .{});
-    std.debug.print("       PatternLocatorX-V5 BY ICsh\n", .{});
+    std.debug.print("   PatternLocatorX-V5 BY ICsh (MT)\n", .{});
     std.debug.print("===========================================\n", .{});
     std.debug.print("Seed: {}\n", .{seed});
     std.debug.print("Search Range: -{} to +{}\n", .{range, range});
+    std.debug.print("Dimension: {s}\n", .{dim_arg});
+    std.debug.print("Directions: {s}\n", .{dirs_display});
+    std.debug.print("Threads: {}\n", .{num_threads});
     std.debug.print("Search Height: {} to {}\n", .{height_range.start_y, height_range.end_y});
     std.debug.print("Pattern size: {}x{}\n", .{ pattern.rows, pattern.cols });
     std.debug.print("Pattern (0=non-bedrock, 1=bedrock, empty=ignore):\n", .{});
@@ -195,50 +254,78 @@ pub fn main() anyerror!void {
     // Calculate total positions for all directions
     const range_size = @intCast(u64, range * 2 + 1);
     const positions_per_direction = range_size * range_size;
-    const total_positions = positions_per_direction * 4; // 4 directions
-    var global_completed: u64 = 0;
-
+    var active_direction_count: u32 = 0;
     var i: usize = 0;
     while (i < 4) : (i += 1) {
-        if (!shouldCheckDirection(dirs_arg, i)) continue;
+        if (shouldCheckDirection(dirs_arg, i)) active_direction_count += 1;
+    }
+    const total_positions = positions_per_direction * active_direction_count;
+
+    var dir_idx: usize = 0;
+    while (dir_idx < 4) : (dir_idx += 1) {
+        if (!shouldCheckDirection(dirs_arg, dir_idx)) continue;
 
         const direction_start_time = std.time.milliTimestamp();
 
-        const rotated = try rotateFlexiblePattern(allocator, pattern, i);
+        const rotated = try rotateFlexiblePattern(allocator, pattern, dir_idx);
         defer rotated.deinit(allocator);
 
         const pattern_3d_struct = try createPattern3DFromFlexible(allocator, rotated);
         defer pattern_3d_struct.deinit(allocator);
 
-        var finder = bedrock.PatternFinder{
-            .gen = generator,
-            .pattern = pattern_3d_struct.pattern,
-        };
-
         var ctx = SearchContext{
-            .direction = directions[i],
-            .rotation = i,
+            .direction = directions[dir_idx],
+            .rotation = dir_idx,
             .found_count = 0,
             .start_time = direction_start_time,
             .global_start_time = start_time,
             .direction_total = positions_per_direction,
             .global_total = total_positions,
-            .global_completed = &global_completed,
-            .direction_number = i + 1,
+            .global_completed = Atomic(u64).init(((dir_idx) * positions_per_direction)),
+            .direction_number = dir_idx + 1,
+            .mutex = Mutex{},
+            .last_print_time = Atomic(i64).init(0),
         };
 
         std.debug.print("--------------------------------------------------------------\n", .{});
-        std.debug.print("                 Searching facing {s}...\n", .{directions[i]});
+        std.debug.print("         Searching facing {s} ({} threads)...\n", .{directions[dir_idx], num_threads});
         std.debug.print("--------------------------------------------------------------\n", .{});
         std.debug.print("\n", .{});
 
-        finder.search(
-            .{ .x = -range, .y = height_range.start_y, .z = -range },
-            .{ .x = range, .y = height_range.end_y, .z = range },
-            &ctx,
-            reportResult,
-            reportProgress,
-        );
+        // Split search area into chunks for threads
+        const x_range_total = range * 2;
+        const chunk_size = @divTrunc(x_range_total, @intCast(i32, num_threads));
+        
+        var threads = try allocator.alloc(Thread, num_threads);
+        defer allocator.free(threads);
+        
+        var tasks = try allocator.alloc(ThreadTask, num_threads);
+        defer allocator.free(tasks);
+
+        // Create and start threads
+        var t: usize = 0;
+        while (t < num_threads) : (t += 1) {
+            const start_x = -range + @intCast(i32, t) * chunk_size;
+            const end_x = if (t == num_threads - 1) range else start_x + chunk_size;
+
+            tasks[t] = ThreadTask{
+                .start_x = start_x,
+                .end_x = end_x,
+                .start_z = -range,
+                .end_z = range,
+                .height_range = height_range,
+                .generator = generator,
+                .pattern = pattern_3d_struct.pattern,
+                .ctx = &ctx,
+            };
+
+            threads[t] = try Thread.spawn(.{}, searchWorker, .{tasks[t]});
+        }
+
+        // Wait for all threads to complete
+        for (threads) |thread| {
+            thread.join();
+        }
 
         const direction_end_time = std.time.milliTimestamp();
         const direction_duration = @intToFloat(f64, direction_end_time - direction_start_time) / 1000.0;
@@ -249,7 +336,7 @@ pub fn main() anyerror!void {
         while (j < 120) : (j += 1) {
             std.debug.print(" ", .{});
         }
-        std.debug.print("\r[{s}] Progress: 100.0% | Time: ", .{directions[i]});
+        std.debug.print("\r[{s}] Progress: 100.0% | Time: ", .{directions[dir_idx]});
         formatDuration(direction_duration);
         std.debug.print(" | Found: {} patterns\n", .{ctx.found_count});
 
@@ -269,6 +356,7 @@ pub fn main() anyerror!void {
     std.debug.print("Positions searched: {}\n", .{total_positions});
     const positions_per_second = @intToFloat(f64, total_positions) / total_duration;
     std.debug.print("Speed: {d:.0} positions/second\n", .{positions_per_second});
+    std.debug.print("Threads used: {}\n", .{num_threads});
     std.debug.print("===========================================\n", .{});
 }
 
@@ -282,8 +370,10 @@ const SearchContext = struct {
     global_start_time: i64,
     direction_total: u64,
     global_total: u64,
-    global_completed: *u64,
+    global_completed: Atomic(u64),
     direction_number: usize,
+    mutex: Mutex,
+    last_print_time: Atomic(i64),
 };
 
 fn shouldCheckDirection(dirs_arg: []const u8, index: usize) bool {
@@ -291,62 +381,83 @@ fn shouldCheckDirection(dirs_arg: []const u8, index: usize) bool {
 
     var chars_to_check: []const u8 = &[_]u8{ 'N', 'E', 'S', 'W' };
     for (dirs_arg) |c| {
-        if (c == ' ' or c == ',') continue; // Leerzeichen oder Komma ignorieren
+        if (c == ' ' or c == ',') continue;
         if (c == chars_to_check[index]) return true;
     }
     return false;
 }
 
-// Report progress for the search (now takes a pointer)
-fn reportProgress(ctx: *SearchContext, completed: u64, _total: u64) void {
+// Report progress for threads - with throttling to reduce contention
+fn reportProgressThreaded(ctx: *SearchContext, completed: u64, _total: u64) void {
     _ = _total;
+    
+    // Update atomic counter (no lock needed)
+    const base_completed = (ctx.direction_number - 1) * ctx.direction_total;
+    _ = ctx.global_completed.store(base_completed + completed, .Monotonic);
 
-    ctx.*.global_completed.* = ((ctx.*.direction_number - 1) * ctx.*.direction_total) + completed;
+    // Only print progress every 500ms to reduce lock contention
+    const current_time = std.time.milliTimestamp();
+    const last_print = ctx.last_print_time.load(.Monotonic);
+    
+    if (current_time - last_print < 500 and completed != ctx.direction_total) {
+        return; // Skip printing if less than 500ms passed
+    }
 
-    if (completed % 10000 == 0 or completed == ctx.*.direction_total) {
-        const actual_completed = @min(completed, ctx.*.direction_total);
-        const percent = (@intToFloat(f64, actual_completed) / @intToFloat(f64, ctx.*.direction_total)) * 100.0;
-        const current_time = std.time.milliTimestamp();
-        const elapsed = @intToFloat(f64, current_time - ctx.*.start_time) / 1000.0;
+    // Try to acquire lock, if we can't, skip this update
+    if (!ctx.mutex.tryLock()) return;
+    defer ctx.mutex.unlock();
 
-        // Progress bar
-        const bar_width: usize = 20;
-        const filled = @floatToInt(usize, (percent / 100.0) * @intToFloat(f64, bar_width));
+    // Double-check time inside lock
+    const last_print_recheck = ctx.last_print_time.load(.Monotonic);
+    if (current_time - last_print_recheck < 500 and completed != ctx.direction_total) {
+        return;
+    }
 
-        // Clear line
-        std.debug.print("\r", .{});
-        var i: usize = 0;
-        while (i < 120) : (i += 1) std.debug.print(" ", .{});
-        std.debug.print("\r", .{});
+    _ = ctx.last_print_time.store(current_time, .Monotonic);
 
-        std.debug.print("[{s}] [", .{ctx.*.direction});
-        var j: usize = 0;
-        while (j < bar_width) : (j += 1) {
-            if (j < filled) std.debug.print("=", .{}) else std.debug.print(" ", .{});
-        }
-        std.debug.print("] ", .{});
-        std.debug.print("{d:.1}% | Time: ", .{percent});
-        formatDuration(elapsed);
+    const actual_completed = @min(completed, ctx.direction_total);
+    const percent = (@intToFloat(f64, actual_completed) / @intToFloat(f64, ctx.direction_total)) * 100.0;
+    const elapsed = @intToFloat(f64, current_time - ctx.start_time) / 1000.0;
 
-        // Calculate ETA, only if elapsed > 0
-        if (elapsed > 0.0 and actual_completed < ctx.*.direction_total) {
-            const rate = @intToFloat(f64, actual_completed) / elapsed;
-            const remaining = @intToFloat(f64, ctx.*.direction_total - actual_completed);
-            const eta_seconds = remaining / rate;
-            std.debug.print(" | ETA: ", .{});
-            formatDuration(eta_seconds);
-        }
+    // Progress bar
+    const bar_width: usize = 20;
+    const filled = @floatToInt(usize, (percent / 100.0) * @intToFloat(f64, bar_width));
 
-        // At 100% completion also show ETA = 0
-        if (actual_completed == ctx.*.direction_total) {
-            std.debug.print(" | ETA: 0s", .{});
-        }
+    // Clear line
+    std.debug.print("\r", .{});
+    var i: usize = 0;
+    while (i < 120) : (i += 1) std.debug.print(" ", .{});
+    std.debug.print("\r", .{});
+
+    std.debug.print("[{s}] [", .{ctx.direction});
+    var j: usize = 0;
+    while (j < bar_width) : (j += 1) {
+        if (j < filled) std.debug.print("=", .{}) else std.debug.print(" ", .{});
+    }
+    std.debug.print("] ", .{});
+    std.debug.print("{d:.1}% | Time: ", .{percent});
+    formatDuration(elapsed);
+
+    // Calculate ETA
+    if (elapsed > 0.0 and actual_completed < ctx.direction_total) {
+        const rate = @intToFloat(f64, actual_completed) / elapsed;
+        const remaining = @intToFloat(f64, ctx.direction_total - actual_completed);
+        const eta_seconds = remaining / rate;
+        std.debug.print(" | ETA: ", .{});
+        formatDuration(eta_seconds);
+    }
+
+    if (actual_completed == ctx.direction_total) {
+        std.debug.print(" | ETA: 0s", .{});
     }
 }
 
-// Report a found pattern (takes pointer)
+// Report a found pattern
 fn reportResult(ctx: *SearchContext, p: bedrock.Point) void {
-    ctx.*.found_count += 1;
+    ctx.mutex.lock();
+    defer ctx.mutex.unlock();
+    
+    ctx.found_count += 1;
 
     // Clear current line
     std.debug.print("\r", .{});
@@ -362,11 +473,11 @@ fn reportResult(ctx: *SearchContext, p: bedrock.Point) void {
         p.x,
         p.y,
         p.z,
-        ctx.*.direction
+        ctx.direction
     }) catch @panic("failed to write to stdout");
 }
 
-// Rotate helper: 90° once (no leaks)
+// Rotate helper: 90° once
 fn rotateOnce(allocator: std.mem.Allocator, input: FlexiblePattern) !FlexiblePattern {
     const new_rows = input.cols;
     const new_cols = input.rows;
