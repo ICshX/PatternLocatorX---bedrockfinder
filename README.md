@@ -12,7 +12,7 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - Windows or compatible OS for running the `.bat` scripts.
 
 ## Usage
-  #### First time use : Add Zig-Path {can be "/" or" \"}
+  ##### First time use : Add Zig-Path {can be "/" or" \"}
   (exmpl: C:\Users\USER\Desktop\zig-windows-x86_64-0.10.1\zig-windows-x86_64-0.10.1\zig.exe)
   
 1. Run the provided `.bat` file.
