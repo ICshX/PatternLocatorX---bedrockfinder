@@ -1,6 +1,7 @@
 //-----------------------------------------------
 // Copyright (c) 2025 ICshX
 // Licensed under the MIT License – see LICENSE
+// Multi-threaded Version - Optimized
 //-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
@@ -112,20 +113,28 @@ const ThreadTask = struct {
     ctx: *SearchContext,
 };
 
-// Thread worker function
+// Thread worker function - optimized with block processing
 fn searchWorker(task: ThreadTask) void {
     var finder = bedrock.PatternFinder{
         .gen = task.generator,
         .pattern = task.pattern,
     };
 
-    finder.search(
-        .{ .x = task.start_x, .y = task.height_range.start_y, .z = task.start_z },
-        .{ .x = task.end_x, .y = task.height_range.end_y, .z = task.end_z },
-        task.ctx,
-        reportResult,
-        reportProgressThreaded,
-    );
+    // OPTIMIZATION: Process in blocks to reduce callback overhead
+    const BLOCK_SIZE = 512;
+    var current_x = task.start_x;
+    
+    while (current_x < task.end_x) : (current_x += BLOCK_SIZE) {
+        const block_end_x = @min(current_x + BLOCK_SIZE, task.end_x);
+        
+        finder.search(
+            .{ .x = current_x, .y = task.height_range.start_y, .z = task.start_z },
+            .{ .x = block_end_x, .y = task.height_range.end_y, .z = task.end_z },
+            task.ctx,
+            reportResult,
+            reportProgressThreaded,
+        );
+    }
 }
 
 pub fn main() anyerror!void {
@@ -155,9 +164,16 @@ pub fn main() anyerror!void {
     const seed = try std.fmt.parseInt(i64, seed_str, 10);
     const range = try std.fmt.parseInt(i32, range_str, 10);
 
-    // Get number of CPU cores, limit to 8 for better chunk sizes
+    // OPTIMIZATION: Intelligent thread count based on workload
     var num_threads = try Thread.getCpuCount();
-    if (num_threads > 8) num_threads = 8;
+    
+    if (range < 1000) {
+        num_threads = @min(num_threads, 2);
+    } else if (range < 5000) {
+        num_threads = @min(num_threads, 4);
+    } else {
+        num_threads = @min(num_threads, 8);
+    }
 
     // Generator erstellen
     var generator: bedrock.GradientGenerator = undefined;
@@ -387,29 +403,29 @@ fn shouldCheckDirection(dirs_arg: []const u8, index: usize) bool {
     return false;
 }
 
-// Report progress for threads - with throttling to reduce contention
+// Report progress for threads - optimized with minimal lock contention
 fn reportProgressThreaded(ctx: *SearchContext, completed: u64, _total: u64) void {
     _ = _total;
     
-    // Update atomic counter (no lock needed)
+    // Update atomic counter (lockless)
     const base_completed = (ctx.direction_number - 1) * ctx.direction_total;
     _ = ctx.global_completed.store(base_completed + completed, .Monotonic);
 
-    // Only print progress every 500ms to reduce lock contention
+    // OPTIMIZATION: Only print every 1 second instead of 500ms
     const current_time = std.time.milliTimestamp();
     const last_print = ctx.last_print_time.load(.Monotonic);
     
-    if (current_time - last_print < 500 and completed != ctx.direction_total) {
-        return; // Skip printing if less than 500ms passed
+    if (current_time - last_print < 1000 and completed != ctx.direction_total) {
+        return;
     }
 
-    // Try to acquire lock, if we can't, skip this update
+    // Try to acquire lock without blocking
     if (!ctx.mutex.tryLock()) return;
     defer ctx.mutex.unlock();
 
     // Double-check time inside lock
     const last_print_recheck = ctx.last_print_time.load(.Monotonic);
-    if (current_time - last_print_recheck < 500 and completed != ctx.direction_total) {
+    if (current_time - last_print_recheck < 1000 and completed != ctx.direction_total) {
         return;
     }
 
@@ -469,7 +485,7 @@ fn reportResult(ctx: *SearchContext, p: bedrock.Point) void {
 
     // Print result
     const out = std.io.getStdOut().writer();
-    out.print(">>> FOUND! X:{}, Y:{}, Z:{} facing {s}\n", .{
+    out.print(">>> FOUND!   {} {} {}   facing {s}\n", .{
         p.x,
         p.y,
         p.z,
