@@ -1,7 +1,7 @@
 //-----------------------------------------------
 // Copyright (c) 2025 ICshX
 // Licensed under the MIT License – see LICENSE
-// Multi-threaded Version - Optimized
+// Multi-threaded Version - Super Optimized
 //-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
@@ -166,14 +166,6 @@ pub fn main() anyerror!void {
 
     // OPTIMIZATION: Intelligent thread count based on workload
     var num_threads = try Thread.getCpuCount();
-    
-    if (range < 1000) {
-        num_threads = @min(num_threads, 2);
-    } else if (range < 5000) {
-        num_threads = @min(num_threads, 4);
-    } else {
-        num_threads = @min(num_threads, 8);
-    }
 
     // Generator erstellen
     var generator: bedrock.GradientGenerator = undefined;
