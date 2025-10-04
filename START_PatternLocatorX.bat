@@ -17,6 +17,8 @@ echo -------------------------------------------------
 REM ================= Default values =================
 set "SEED=0"
 set "RANGE=10000"
+set "STARTX=0"
+set "STARTZ=0"
 set "CONFIG=config.txt"
 set "LASTSEEDFILE=last_seed.txt"
 set "PATTERN_LOG_DIR=Pattern-log"
@@ -58,6 +60,17 @@ if not "!USERSEED!"=="" set "SEED=!USERSEED!"
 echo Enter Range (leave blank for default %RANGE%):
 set /p USERRANGE=
 if not "!USERRANGE!"=="" set "RANGE=!USERRANGE!"
+
+echo Enter Start coordinates X Z (default 0 0):
+set /p COORDS=
+for /f "tokens=1,2" %%a in ("!COORDS!") do (
+    set "USERSTARTX=%%a"
+    set "USERSTARTZ=%%b"
+)
+if not defined USERSTARTX set "USERSTARTX=0"
+if not defined USERSTARTZ set "USERSTARTZ=0"
+set "STARTX=!USERSTARTX!"
+set "STARTZ=!USERSTARTZ!"
 
 REM ================= Pattern input =================
 echo.
@@ -126,33 +139,16 @@ if /i not "!USERDIM!"=="overworld" if /i not "!USERDIM!"=="netherfloor" if /i no
     exit /b
 )
 
-REM ================= Set search height automatically =================
-set "LOWER_Y=0"
-set "UPPER_Y=0"
-if /i "!USERDIM!"=="overworld" (
-    set "LOWER_Y=4"
-    set "UPPER_Y=5"
-) else if /i "!USERDIM!"=="netherfloor" (
-    set "LOWER_Y=4"
-    set "UPPER_Y=5"
-) else if /i "!USERDIM!"=="netherceiling" (
-    set "LOWER_Y=122"
-    set "UPPER_Y=127"
-)
-
 REM ================= Run program =================
-echo Running PatternLocatorX...
-echo Seed: %SEED%
-echo Range: %RANGE%
-echo Dimension: %USERDIM%
-echo Directions: %USERDIRS%
-
+echo ------------------------------
+echo   Running PatternLocatorX...
+echo ------------------------------
 if defined PATTERNFILE (
-    REM Arrangement: Seed, Range, Dimension, Pattern-Datei, Directions
-    "%ZIGPATH%" run main.zig -O ReleaseFast -- %SEED% %RANGE% "%PATTERNFILE%" "%USERDIRS%" %USERDIM%
+    REM Arrangement: Seed, Range, StartX, StartZ, Pattern, Directions, Dimension
+    "%ZIGPATH%" run main.zig -O ReleaseFast -- %SEED% %RANGE% %STARTX% %STARTZ% "%PATTERNFILE%" "%USERDIRS%" %USERDIM%
 ) else (
-    REM Arrangement: Seed, Range, Dimension, Directions (Without Pattern-file)
-    "%ZIGPATH%" run main.zig -O ReleaseFast -- %SEED% %RANGE% "%USERDIRS%" %USERDIM%
+    REM Arrangement: Seed, Range, StartX, StartZ, Directions, Dimension (no pattern file)
+    "%ZIGPATH%" run main.zig -O ReleaseFast -- %SEED% %RANGE% %STARTX% %STARTZ% "%USERDIRS%" %USERDIM%
 )
 
 REM ================= Save last seed =================
