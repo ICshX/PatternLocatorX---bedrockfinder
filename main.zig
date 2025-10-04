@@ -1,7 +1,7 @@
 //-----------------------------------------------
 // Copyright (c) 2025 ICshX
 // Licensed under the MIT License – see LICENSE
-// Multi-threaded Version - Super Optimized
+// Added optional start-point support (center X,Z) for searches
 //-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
@@ -124,8 +124,8 @@ fn searchWorker(task: ThreadTask) void {
     const BLOCK_SIZE = 512;
     var current_x = task.start_x;
     
-    while (current_x < task.end_x) : (current_x += BLOCK_SIZE) {
-        const block_end_x = @min(current_x + BLOCK_SIZE, task.end_x);
+    while (current_x <= task.end_x) : (current_x += BLOCK_SIZE) {
+        const block_end_x = @min(current_x + BLOCK_SIZE - 1, task.end_x);
         
         finder.search(
             .{ .x = current_x, .y = task.height_range.start_y, .z = task.start_z },
@@ -148,21 +148,47 @@ pub fn main() anyerror!void {
     std.debug.assert(args.skip());
 
     const seed_str = args.next() orelse {
-        std.debug.print("Usage: bedrock_finder <seed> <range> [pattern_file] [dirs] [dimension]\n", .{});
+        std.debug.print("Usage: bedrock_finder <seed> <range> [start_x start_z] [pattern_file] [dirs] [dimension]\n", .{});
         return error.NotEnoughArgs;
     };
     const range_str = args.next() orelse {
-        std.debug.print("Usage: bedrock_finder <seed> <range> [pattern_file] [dirs] [dimension]\n", .{});
+        std.debug.print("Usage: bedrock_finder <seed> <range> [start_x start_z] [pattern_file] [dirs] [dimension]\n", .{});
         return error.NotEnoughArgs;
     };
 
-    // optional: pattern_file, dirs, dimension
+    // optional: start_x, start_z, pattern_file, dirs, dimension
+    var start_x_arg = args.next();
+    var start_z_arg = args.next();
     const pattern_file_path = args.next();
     const dirs_arg = args.next() orelse "all";
     const dim_arg = args.next() orelse "overworld";
 
     const seed = try std.fmt.parseInt(i64, seed_str, 10);
     const range = try std.fmt.parseInt(i32, range_str, 10);
+
+    // Parse optional start point if both provided, else default to 0,0
+    var center_x: i32 = 0; 
+    var center_z: i32 = 0;
+
+    if (start_x_arg) |sx_str| {
+        if (start_z_arg) |sz_str| {
+            const parseInt = std.fmt.parseInt;
+            const sx = parseInt(i32, sx_str, 10) catch 0;
+            const sz = parseInt(i32, sz_str, 10) catch 0;
+            center_x = sx;
+            center_z = sz;
+        } else {
+            center_x = 0;
+            center_z = 0;
+        }
+    } else {
+        center_x = 0;
+        center_z = 0;
+    }
+
+    std.debug.print("Center point: X = {}, Z = {}\n", .{ center_x, center_z });
+
+
 
     // OPTIMIZATION: Intelligent thread count based on workload
     var num_threads = try Thread.getCpuCount();
@@ -246,6 +272,7 @@ pub fn main() anyerror!void {
     std.debug.print("===========================================\n", .{});
     std.debug.print("Seed: {}\n", .{seed});
     std.debug.print("Search Range: -{} to +{}\n", .{range, range});
+    std.debug.print("Start point (center): {} {}\n", .{center_x, center_z});
     std.debug.print("Dimension: {s}\n", .{dim_arg});
     std.debug.print("Directions: {s}\n", .{dirs_display});
     std.debug.print("Threads: {}\n", .{num_threads});
@@ -268,6 +295,12 @@ pub fn main() anyerror!void {
         if (shouldCheckDirection(dirs_arg, i)) active_direction_count += 1;
     }
     const total_positions = positions_per_direction * active_direction_count;
+
+    // Compute absolute bounds centered around center_x, center_z
+    const global_start_x = center_x - range;
+    const global_end_x = center_x + range;
+    const global_start_z = center_z - range;
+    const global_end_z = center_z + range;
 
     var dir_idx: usize = 0;
     while (dir_idx < 4) : (dir_idx += 1) {
@@ -301,8 +334,8 @@ pub fn main() anyerror!void {
         std.debug.print("\n", .{});
 
         // Split search area into chunks for threads
-        const x_range_total = range * 2;
-        const chunk_size = @divTrunc(x_range_total, @intCast(i32, num_threads));
+        const x_range_total = global_end_x - global_start_x + 1; // inclusive count
+        const chunk_size = @intCast(i32, (@divTrunc(@intCast(i32, x_range_total), @intCast(i32, num_threads)))) ;
         
         var threads = try allocator.alloc(Thread, num_threads);
         defer allocator.free(threads);
@@ -313,14 +346,14 @@ pub fn main() anyerror!void {
         // Create and start threads
         var t: usize = 0;
         while (t < num_threads) : (t += 1) {
-            const start_x = -range + @intCast(i32, t) * chunk_size;
-            const end_x = if (t == num_threads - 1) range else start_x + chunk_size;
+            const start_x = global_start_x + @intCast(i32, t) * chunk_size;
+            const end_x = if (t == num_threads - 1) global_end_x else start_x + chunk_size - 1;
 
             tasks[t] = ThreadTask{
                 .start_x = start_x,
                 .end_x = end_x,
-                .start_z = -range,
-                .end_z = range,
+                .start_z = global_start_z,
+                .end_z = global_end_z,
                 .height_range = height_range,
                 .generator = generator,
                 .pattern = pattern_3d_struct.pattern,
