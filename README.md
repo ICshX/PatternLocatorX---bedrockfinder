@@ -6,6 +6,7 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - Automatic search height based on dimension.
 - Multi-directional pattern scanning.
 - Outputs exact coordinates for matches.
+- Search starting point
 
 ## Requirements
 - **Zig 0.10.1**: Download from [ziglang.org](https://ziglang.org/download/).
