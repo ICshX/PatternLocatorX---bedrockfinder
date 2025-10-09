@@ -13,15 +13,16 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - Windows or compatible OS for running the `.bat` scripts.
 
 ## Usage
-  ##### First time use : Add Zig-Path (exmpl: C:\Users\USER\Desktop\zig-windows-x86_64-0.10.1\zig-windows-x86_64-0.10.1\zig.exe) {can be "/"}
+  ##### First time use : Add Zig-Path (exmpl: "C:\Users\USER\Desktop\zig-windows-x86_64-0.10.1\zig-windows-x86_64-0.10.1\zig.exe") {can be "/"}
   
 1. Run the provided `.bat` file.
 2. Enter the Minecraft seed.
 3. Specify the search range (default: 10000).
-4. Input your bedrock pattern row by row or load a previous pattern file.
-5. Choose directions to check (`N`, `E`, `S`, `W`) or leave blank for all.
-6. Select the dimension: `overworld`, `netherfloor`, or `netherceiling`.
-7. The program outputs matching coordinates in the console.
+4. Enter the starting point
+5. Input your bedrock pattern row by row (type "end" to finish) or load a previous pattern file. (exmpl: "load pattern_20250910_194810,62.txt")
+6. Choose directions to check (`N`, `E`, `S`, `W`) or leave blank for all. (exmpl: "NWS")
+7. Select the dimension: `overworld`, `netherfloor`, or `netherceiling`.
+8. The program outputs matching coordinates in the console.
 
 ## Notes
 - Ensure your seed is correct; SeedcrackerX can help find it on servers.
