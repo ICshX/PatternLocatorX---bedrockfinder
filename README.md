@@ -25,12 +25,12 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 8. The program outputs matching coordinates in the console.
 
 ## Notes
+- 1.18+ only
 - Ensure your seed is correct; SeedcrackerX can help find it on servers.
 - The search height is automatically set based on dimension.
 - Patterns are saved in the `Pattern-log` directory for reuse.
-- 1.18+ only
-- DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs)
-- Use the startpoint system with a large pattern and a realistic range for better results. 
+- Use the startpoint system with a large pattern and a realistic range for better results.
+- DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs) 
 
 ## License
 This project is released under the MIT License. See `LICENSE` for details.
