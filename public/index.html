@@ -104,13 +104,17 @@ button {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   box-shadow: 0 4px 15px rgba(102,126,234,0.4);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102,126,234,0.6);
 }
-.btn-secondary { background: #6c757d; color: #fff; }
+.btn-secondary {
+  background: #6c757d;
+  color: #fff;
+  margin-bottom: 12px;
+}
 .btn-secondary:hover { background: #5a6268; }
 
 /* ======= Status Messages ======= */
@@ -159,8 +163,8 @@ button {
 
       <div class="form-row">
         <div class="form-group">
-          <label for="range">Range</label>
-          <input type="number" id="range" value="1000" min="1" max="10000">
+          <label for="range">Range (max 3000)</label>
+          <input type="number" id="range" value="1000" min="1" max="3000">
         </div>
         <div class="form-group">
           <label for="dimension">Dimension</label>
@@ -196,7 +200,7 @@ button {
 
       <button type="submit" class="btn-primary" id="startBtn">🚀 Start Search</button>
       <button type="button" class="btn-secondary" id="stopBtn">⛔ Stop Search</button>
-      <button type="button" class="btn-secondary" onclick="clearTerminal()">🗑️ Clear Terminal</button>
+      <button type="button" class="btn-secondary" id="clearBtn">🗑️ Clear Terminal</button>
     </form>
   </div>
 
@@ -216,64 +220,58 @@ button {
 <div id="globalStatus">🌐 Connecting...</div>
 
 <script>
-const term = document.getElementById('terminal');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const statusBox = document.getElementById('status');
-const globalBox = document.getElementById('globalStatus');
+const term=document.getElementById('terminal');
+const startBtn=document.getElementById('startBtn');
+const stopBtn=document.getElementById('stopBtn');
+const clearBtn=document.getElementById('clearBtn');
+const statusBox=document.getElementById('status');
+const globalBox=document.getElementById('globalStatus');
 
-let currentSearchId = null;
-let eventSource = null;
+let currentSearchId=null;
+let eventSource=null;
 
-// Logging
-function log(msg, type='info') {
-  const line = document.createElement('div');
-  line.className = `log-line log-${type}`;
-  line.textContent = msg;
-  term.appendChild(line);
-  term.scrollTop = term.scrollHeight;
-}
-function clearTerminal(){ term.innerHTML='<div class="log-dim">Terminal cleared.</div>'; }
-function showStatus(msg,type){ statusBox.textContent=msg; statusBox.className=`status ${type}`; statusBox.style.display='block'; }
+function log(msg,type='info'){const l=document.createElement('div');l.className=`log-line log-${type}`;l.textContent=msg;term.appendChild(l);term.scrollTop=term.scrollHeight;}
+function clearTerminal(){term.innerHTML='<div class="log-dim">Terminal cleared.</div>';}
+function showStatus(msg,type){statusBox.textContent=msg;statusBox.className=`status ${type}`;statusBox.style.display='block';}
 
-// Stop current search
 async function stopSearch(){
-  if(!currentSearchId) return;
+  if(!currentSearchId)return;
   await fetch(`/api/search/stop/${currentSearchId}`,{method:'POST'});
-  if(eventSource) eventSource.close();
+  if(eventSource)eventSource.close();
   log('⛔ Search stopped by user','warning');
   showStatus('Search stopped','error');
-  startBtn.disabled=false; stopBtn.disabled=true;
+  startBtn.disabled=false;stopBtn.disabled=true;
   currentSearchId=null;
 }
 
-// Submit handler
 document.getElementById('searchForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const seed=document.getElementById('seed').value.trim();
+  const rangeVal=parseInt(document.getElementById('range').value)||0;
   if(!seed){showStatus('Enter a seed!','error');return;}
+  if(rangeVal>3000){showStatus('Range exceeds maximum (3000)!','error');return;}
   const data={
     seed,
-    range:document.getElementById('range').value,
+    range:rangeVal,
     startX:document.getElementById('startX').value,
     startZ:document.getElementById('startZ').value,
     dimension:document.getElementById('dimension').value,
-    directions:['N','E','S','W'].filter((d,i)=>document.getElementById('dir'+d).checked).join(''),
+    directions:['N','E','S','W'].filter(d=>document.getElementById('dir'+d).checked).join(''),
     pattern:document.getElementById('pattern').value.trim()
   };
   clearTerminal();
-  startBtn.disabled=true; stopBtn.disabled=false;
+  startBtn.disabled=true;stopBtn.disabled=false;
   showStatus('Starting Zig process...','info');
   try{
     const res=await fetch('/api/search/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const j=await res.json();
-    if(!res.ok) throw new Error(j.error||'Server error');
-    currentSearchId=j.searchId; log(`Started search ${j.searchId}`,'highlight');
+    if(!res.ok)throw new Error(j.error||'Server error');
+    currentSearchId=j.searchId;log(`Started search ${j.searchId}`,'highlight');
     eventSource=new EventSource(`/api/search/${j.searchId}`);
     eventSource.onmessage=e=>{
       const p=JSON.parse(e.data);
-      if(!p) return;
-      if(p.type==='log') log(p.message,p.level||'info');
+      if(!p)return;
+      if(p.type==='log')log(p.message,p.level||'info');
       if(p.type==='complete'){log(p.message,'success');showStatus('Search complete','success');reset();}
       if(p.type==='stopped'){log(p.message,'error');showStatus('Stopped','error');reset();}
     };
@@ -285,15 +283,11 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
   }
 });
 
-function reset(){
-  if(eventSource) eventSource.close();
-  startBtn.disabled=false; stopBtn.disabled=true;
-  currentSearchId=null;
-}
+function reset(){if(eventSource)eventSource.close();startBtn.disabled=false;stopBtn.disabled=true;currentSearchId=null;}
 stopBtn.addEventListener('click',stopSearch);
+clearBtn.addEventListener('click',clearTerminal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')stopSearch();});
 
-// Live global status
 const globalSource=new EventSource('/global');
 globalSource.onmessage=e=>{
   const s=JSON.parse(e.data);
