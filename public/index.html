@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PatternLocatorX</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow-y: auto;
+        }
+
+        .terminal-container {
+            background: #1a1d23;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: #2d3139;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #3d4149;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .terminal-title {
+            color: #8b949e;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        .terminal-output {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #c9d1d9;
+        }
+
+        .terminal-output::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: #1a1d23;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background: #3d4149;
+            border-radius: 5px;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.9em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            font-family: 'Consolas', monospace;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .checkbox-item input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-weight: normal !important;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            font-size: 1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            margin-bottom: 10px;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border-left: 4px solid #388e3c;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .log-line {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .log-info { color: #58a6ff; }
+        .log-success { color: #3fb950; }
+        .log-warning { color: #f0883e; }
+        .log-error { color: #f85149; }
+        .log-highlight { color: #ffd700; font-weight: bold; }
+        .log-dim { color: #8b949e; }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .terminal-container {
+                min-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>⛏️ PatternLocatorX</h1>
+            <p class="subtitle">Bedrock Pattern Finder</p>
+
+            <div id="status" class="status"></div>
+
+            <form id="searchForm">
+                <div class="form-group">
+                    <label for="seed">Minecraft Seed *</label>
+                    <input type="text" id="seed" placeholder="e.g., 12345678901234" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="range">Range</label>
+                        <input type="number" id="range" value="10000" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="dimension">Dimension</label>
+                        <select id="dimension">
+                            <option value="overworld">Overworld</option>
+                            <option value="netherfloor">Nether Floor</option>
+                            <option value="netherceiling">Nether Ceiling</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="startX">Start X</label>
+                        <input type="number" id="startX" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="startZ">Start Z</label>
+                        <input type="number" id="startZ" value="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Directions</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="dirN" checked>
+                            <label for="dirN">North</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="dirE" checked>
+                            <label for="dirE">East</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="dirS" checked>
+                            <label for="dirS">South</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="dirW" checked>
+                            <label for="dirW">West</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="pattern">Pattern (0=air, 1=bedrock, .=ignore)</label>
+                    <textarea id="pattern" placeholder="101&#10;010&#10;101">101
+010
+101</textarea>
+                </div>
+
+                <button type="submit" class="btn-primary" id="startBtn">
+                    🚀 Start Search
+                </button>
+                <button type="button" class="btn-secondary" onclick="clearTerminal()">
+                    🗑️ Clear Terminal
+                </button>
+            </form>
+        </div>
+
+        <div class="terminal-container">
+            <div class="terminal-header">
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+                <span class="terminal-title">PatternLocatorX Output</span>
+            </div>
+            <div class="terminal-output" id="terminal">
+                <div class="log-dim">Ready to search. Configure parameters and click "Start Search".</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+        const statusDiv = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line log-${type}`;
+            line.textContent = message;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function clearTerminal() {
+            terminal.innerHTML = '<div class="log-dim">Terminal cleared.</div>';
+        }
+
+        let currentSearchId = null;
+        let eventSource = null;
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line log-${type}`;
+            line.textContent = message;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        function clearTerminal() {
+            terminal.innerHTML = '<div class="log-dim">Terminal cleared.</div>';
+        }
+
+        async function stopSearch() {
+            if (!currentSearchId) return;
+            await fetch(`/api/search/stop/${currentSearchId}`, { method: 'POST' });
+            if (eventSource) eventSource.close();
+            showStatus('Search stopped by user', 'error');
+            log('⛔ Search stopped by user', 'error');
+            startBtn.disabled = false;
+            startBtn.textContent = '🚀 Start Search';
+            currentSearchId = null;
+        }
+
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const seed = document.getElementById('seed').value.trim();
+            const range = document.getElementById('range').value || '10000';
+            const startX = document.getElementById('startX').value || '0';
+            const startZ = document.getElementById('startZ').value || '0';
+            const dimension = document.getElementById('dimension').value;
+            const pattern = document.getElementById('pattern').value.trim();
+
+            const directions = [];
+            if (document.getElementById('dirN').checked) directions.push('N');
+            if (document.getElementById('dirE').checked) directions.push('E');
+            if (document.getElementById('dirS').checked) directions.push('S');
+            if (document.getElementById('dirW').checked) directions.push('W');
+
+            if (!seed) {
+                showStatus('Please enter a seed!', 'error');
+                return;
+            }
+
+            clearTerminal();
+            startBtn.disabled = true;
+            startBtn.textContent = '⏳ Running...';
+            showStatus('Starting Zig process...', 'info');
+
+            try {
+                // Step 1: Start the search on backend
+                const res = await fetch('/api/search/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seed, range, startX, startZ, dimension, directions: directions.join(''), pattern
+                    })
+                });
+
+                const data = await res.json();
+                if (!data.searchId) throw new Error('No searchId returned');
+
+                currentSearchId = data.searchId;
+                log(`Started search ${currentSearchId}`, 'highlight');
+
+                // Step 2: Open SSE connection for live updates
+                eventSource = new EventSource(`/api/search/${currentSearchId}`);
+
+                eventSource.onmessage = (event) => {
+                    const payload = JSON.parse(event.data);
+                    if (!payload) return;
+
+                    switch (payload.type) {
+                        case 'connected':
+                            log(`Connected to search stream [${payload.searchId}]`, 'dim');
+                            break;
+
+                        case 'log':
+                            log(payload.message, payload.level || 'info');
+                            break;
+
+                        case 'error':
+                            log(`⚠️ ${payload.message}`, 'error');
+                            break;
+
+                        case 'complete':
+                            log('===========================================', 'info');
+                            log(payload.message, payload.exitCode === 0 ? 'success' : 'error');
+                            log('===========================================', 'info');
+                            showStatus('Search complete', 'success');
+                            startBtn.disabled = false;
+                            startBtn.textContent = '🚀 Start Search';
+                            eventSource.close();
+                            currentSearchId = null;
+                            break;
+
+                        case 'stopped':
+                            log('⛔ ' + payload.message, 'warning');
+                            showStatus(payload.message, 'error');
+                            startBtn.disabled = false;
+                            startBtn.textContent = '🚀 Start Search';
+                            eventSource.close();
+                            currentSearchId = null;
+                            break;
+                    }
+                };
+
+                eventSource.onerror = (err) => {
+                    log('⚠️ SSE connection lost', 'error');
+                    eventSource.close();
+                    startBtn.disabled = false;
+                    startBtn.textContent = '🚀 Start Search';
+                    currentSearchId = null;
+                };
+
+            } catch (err) {
+                showStatus('Failed to start search: ' + err.message, 'error');
+                log('❌ ' + err.message, 'error');
+                startBtn.disabled = false;
+                startBtn.textContent = '🚀 Start Search';
+            }
+        });
+
+        // Optional: Stop search when pressing ESC
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && currentSearchId) {
+                stopSearch();
+            }
+        });
+    </script>
+</body>
+</html>

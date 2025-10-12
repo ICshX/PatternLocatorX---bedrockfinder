@@ -1,0 +1,21 @@
+{
+  "name": "patternlocatorx-server",
+  "version": "1.0.0",
+  "description": "Web interface for PatternLocatorX Bedrock Pattern Finder",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "minecraft",
+    "bedrock",
+    "pattern",
+    "finder"
+  ],
+  "author": "ICshX",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
