@@ -39,7 +39,9 @@ fn createPatternFromString(allocator: std.mem.Allocator, pattern_str: []const []
         pattern_data[i] = try allocator.alloc(u8, row_str.len);
         max_cols = @max(max_cols, row_str.len);
 
-        for (row_str) |char, j| {
+        var j: usize = 0;
+        while (j < row_str.len) : (j += 1) {
+            const char = row_str[j];
             pattern_data[i][j] = switch (char) {
                 '0' => 0,
                 '1' => 1,
@@ -74,7 +76,8 @@ fn getHeightRange(dimension: []const u8) HeightRange {
     } else if (std.mem.eql(u8, dimension, "netherceiling")) {
         return HeightRange{ .start_y = 123, .end_y = 123 };
     } else {
-        return HeightRange{ .start_y = -60, .end_y = -60 }; // fallback
+        // fallback
+        return HeightRange{ .start_y = -60, .end_y = -60 };
     }
 }
 
@@ -144,25 +147,25 @@ pub fn main() anyerror!void {
     defer _ = gpa.deinit();
     var allocator = gpa.allocator();
 
-    // Arguments
+    // Arguments parsing (CLI / web-invoked)
     var args = try std.process.argsWithAllocator(allocator);
     defer args.deinit();
     std.debug.assert(args.skip());
 
     const seed_str = args.next() orelse {
-        std.debug.print("Usage: bedrock_finder <seed> <range> [start_x start_z] [pattern_file] [dirs] [dimension]\n", .{});
-        return error.NotEnoughArgs;
+        std.debug.print("Usage: bedrock_finder <seed> [range] [start_x start_z] [pattern_file] [dirs] [dimension]\n", .{});
+        return;
     };
 
-    // Default + range parsing
+    // Default + range parsing: default 1000, max 2500
     var range: i32 = 1000; // default
     if (args.next()) |range_str| {
-        range = std.fmt.parseInt(i32, range_str, 10) catch 5000;
+        range = std.fmt.parseInt(i32, range_str, 10) catch range;
     }
 
     if (range > 2500) {
         std.debug.print("❌ Error: Range exceeds the maximum limit (2500). Provided: {}\n", .{range});
-        return error.RangeTooLarge;
+        return;
     }
 
     // optional: start_x, start_z, pattern_file, dirs, dimension
@@ -181,17 +184,19 @@ pub fn main() anyerror!void {
     if (start_x_arg) |sx_str| {
         if (start_z_arg) |sz_str| {
             const parseInt = std.fmt.parseInt;
-            const sx = parseInt(i32, sx_str, 10) catch 0;
-            const sz = parseInt(i32, sz_str, 10) catch 0;
-            center_x = sx;
-            center_z = sz;
+            center_x = parseInt(i32, sx_str, 10) catch 0;
+            center_z = parseInt(i32, sz_str, 10) catch 0;
         }
     }
 
-    // OPTIMIZATION: Intelligent thread count based on workload
-    var num_threads = try Thread.getCpuCount();
+    // Determine number of threads: try to detect CPU count, fallback to 1
+    var num_threads: usize = 1;
+    const cpu_count = std.os.cpu_count() catch 1;
+    num_threads = @intCast(usize, cpu_count);
 
-    // Generator erstellen
+    if (num_threads == 0) num_threads = 1;
+
+    // Generator selection
     var generator: bedrock.GradientGenerator = undefined;
     if (std.mem.eql(u8, dim_arg, "overworld")) {
         generator = bedrock.GradientGenerator.overworldFloor(seed);
@@ -201,10 +206,10 @@ pub fn main() anyerror!void {
         generator = bedrock.GradientGenerator.netherCeiling(seed);
     } else {
         std.debug.print("Unknown dimension: {s}\n", .{dim_arg});
-        return error.InvalidDimension;
+        return;
     }
 
-    // Pattern laden
+    // Load pattern either from file or default
     var pattern: FlexiblePattern = undefined;
     if (pattern_file_path) |pf| {
         var contents = try std.fs.cwd().readFileAlloc(allocator, pf, 10 * 1024 * 1024);
@@ -226,7 +231,17 @@ pub fn main() anyerror!void {
             }
         }
 
-        pattern = try createPatternFromString(allocator, lines_list.items[0..lines_list.items.len]);
+        if (lines_list.items.len == 0) {
+            // fallback to default if file empty
+            const default_pattern = [_][]const u8{
+                "101",
+                "010",
+                "101",
+            };
+            pattern = try createPatternFromString(allocator, &default_pattern);
+        } else {
+            pattern = try createPatternFromString(allocator, lines_list.items[0..lines_list.items.len]);
+        }
     } else {
         const default_pattern = [_][]const u8{
             "101",
@@ -240,7 +255,7 @@ pub fn main() anyerror!void {
     // Determine search height range based on dimension
     const height_range = getHeightRange(dim_arg);
 
-    // Convert directions argument to readable format
+    // Convert directions argument to readable format for printing
     const dirs_display = blk: {
         if (std.mem.eql(u8, dirs_arg, "all")) {
             break :blk "North, East, South, West";
@@ -366,19 +381,6 @@ pub fn main() anyerror!void {
             thread.join();
         }
 
-        //const direction_end_time = std.time.milliTimestamp();
-        //const direction_duration = @intToFloat(f64, direction_end_time - direction_start_time) / 1000.0;
-
-        //Final progress display for this direction
-        //std.debug.print("\r", .{});
-        var j: usize = 0;
-        while (j < 120) : (j += 1) {
-            //std.debug.print(" ", .{});
-        }
-        //std.debug.print("\r[{s}] Progress: 100.0% | Time: ", .{directions[dir_idx]});
-        //formatDuration(direction_duration);
-        //std.debug.print(" | Found: {} patterns\n", .{ctx.found_count});
-
         total_found += ctx.found_count;
     }
 
@@ -432,9 +434,8 @@ fn reportProgressThreaded(ctx: *SearchContext, completed: u64, _total: u64) void
     _ = completed;
     _ = _total;
 
-    // Disable progress output completely.
-    // This function is kept to maintain compatibility
-    // but it does not print anything.
+    // Disable progress output completely for web-friendly mode.
+    // Kept for API compatibility with bedrock.PatternFinder.
 }
 
 // Report a found pattern
@@ -444,17 +445,9 @@ fn reportResult(ctx: *SearchContext, p: bedrock.Point) void {
 
     ctx.found_count += 1;
 
-    // Clear current line
-    std.debug.print("\r", .{});
-    var i: usize = 0;
-    while (i < 120) : (i += 1) {
-        std.debug.print(" ", .{});
-    }
-    std.debug.print("\r", .{});
-
-    // Print result
+    // Print result as single-line output
     const out = std.io.getStdOut().writer();
-    out.print(">>> FOUND!   {} {} {}   facing {s}\n", .{ p.x, p.y, p.z, ctx.direction }) catch @panic("failed to write to stdout");
+    out.print(">>> FOUND!   {d} {d} {d}   facing {s}\n", .{ p.x, p.y, p.z, ctx.direction }) catch @panic("failed to write to stdout");
 }
 
 // Rotate helper: 90° once
