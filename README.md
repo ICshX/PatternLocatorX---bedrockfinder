@@ -1,4 +1,4 @@
-PatternLocatorX is a utility for Minecraft that allows you to find exact coordinates based on a specific bedrock pattern in your world. By analyzing bedrock layers, it helps locate precise spots using seed-based searches.
+PatternLocatorX is a utility for Minecraft that allows you to find exact coordinates based on a specific bedrock pattern in your world. By analyzing bedrock layers, it helps locate precise spots using seed-based searches. Note: Download v6.4- for easier use!!!
 
 ## Features
 - Supports **Overworld** and **Nether** (floor and ceiling) searches.
@@ -7,31 +7,16 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - Multi-directional pattern scanning.
 - Outputs exact coordinates for matches.
 - Configurable search starting point
-- **[WEB-V1 only]** Easy web-app input
+- Easy web-app input
 
 ## Requirements
-- **Zig 0.10.1**: Download from [ziglang.org](https://ziglang.org/download/).
-- **[WEB-V1 only]** Install path ***MUST*** be "C:\Program Files\zig\zig.exe"
-- **[WEB-V1 only]** **Node.js v14+** download from [nodejs.org](https://nodejs.org/en/download)
-- **[V6.4- only]** Windows or compatible OS for running the `.bat` scripts.
-
-
+- **Zig 0.10.1**: Download from [ziglang.org](https://ziglang.org/download/).#
+- **Node.js v14+** download from [nodejs.org](https://nodejs.org/en/download)
+- Zig Install path ***MUST*** be "C:\Program Files\zig\zig.exe"
+ 
 ## Usage
-**[WEB-V1 only]**
 1. Open cmd in the tools path and type "npm install express cors"
 2. To launch the tool type "node server.js"
-
-**[V6.4- only]**
-  ##### First time use : Add Zig-Path (exmpl: "C:\Users\USER\Desktop\zig-windows-x86_64-0.10.1\zig-windows-x86_64-0.10.1\zig.exe") {can be "/"}
-  
-1. Run the provided `.bat` file.
-2. Enter the Minecraft seed.
-3. Specify the search range (default: 10000).
-4. Enter the starting point
-5. Input your bedrock pattern row by row (type "end" to finish) or load a previous pattern file. (exmpl: "load pattern_20250910_194810,62.txt")
-6. Choose directions to check (`N`, `E`, `S`, `W`) or leave blank for all. (exmpl: "NWS")
-7. Select the dimension: `overworld`, `netherfloor`, or `netherceiling`.
-8. The program outputs matching coordinates in the console.
 
 ## Notes
 - 1.18+ only
@@ -39,8 +24,6 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - The search height is automatically set based on dimension.
 - Patterns are saved in the `Pattern-log` directory for reuse.
 - Use the startpoint system with a large pattern and a realistic range for better results.
-- DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs)
-- WEB-V1 is a lot slower than any other version [only use V6.5+ for fast searches]
 
 ## License
 This project is released under the MIT License. See `LICENSE` for details.
