@@ -183,9 +183,21 @@ let currentSearchId=null;
 let eventSource=null;
 let timeoutHandle=null;
 
-function log(msg,type='info'){const l=document.createElement('div');l.className=`log-line log-${type}`;l.textContent=msg;term.appendChild(l);term.scrollTop=term.scrollHeight;}
-function clearTerminal(){term.innerHTML='<div class="log-dim">Terminal cleared.</div>';}
-function showStatus(msg,type){statusBox.textContent=msg;statusBox.className=`status ${type}`;statusBox.style.display='block';}
+function log(msg,type='info'){
+  const l=document.createElement('div');
+  l.className=`log-line log-${type}`;
+  l.textContent=msg;
+  term.appendChild(l);
+  term.scrollTop=term.scrollHeight;
+}
+function clearTerminal(){
+  term.innerHTML='<div class="log-dim">Terminal cleared.</div>';
+}
+function showStatus(msg,type){
+  statusBox.textContent=msg;
+  statusBox.className=`status ${type}`;
+  statusBox.style.display='block';
+}
 
 async function stopSearch(reason='User stopped'){
   if(!currentSearchId)return;
@@ -193,7 +205,8 @@ async function stopSearch(reason='User stopped'){
   if(eventSource)eventSource.close();
   log(`⛔ ${reason}`,'warning');
   showStatus(reason,'error');
-  startBtn.disabled=false;stopBtn.disabled=true;
+  startBtn.disabled=false;
+  stopBtn.disabled=true;
   clearTimeout(timeoutHandle);
   currentSearchId=null;
 }
@@ -214,7 +227,8 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
     pattern:document.getElementById('pattern').value.trim()
   };
   clearTerminal();
-  startBtn.disabled=true;stopBtn.disabled=false;
+  startBtn.disabled=true;
+  stopBtn.disabled=false;
   showStatus('Starting Zig process...','info');
   try{
     const res=await fetch('/api/search/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
@@ -224,28 +238,15 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
     log(`Started search ${j.searchId}`,'highlight');
     eventSource=new EventSource(`/api/search/${j.searchId}`);
 
-    // ⏱ Auto-timeout after 60 seconds
     clearTimeout(timeoutHandle);
-    timeoutHandle=setTimeout(()=>{
-      if(currentSearchId){
-        stopSearch('⏰ Search timed out after 60s');
-      }
-    },60000);
+    timeoutHandle=setTimeout(()=>{if(currentSearchId){stopSearch('⏰ Search timed out after 60s');}},60000);
 
     eventSource.onmessage=e=>{
       const p=JSON.parse(e.data);
       if(!p)return;
       if(p.type==='log')log(p.message,p.level||'info');
-      if(p.type==='complete'){
-        log(p.message,'success');
-        showStatus('Search complete','success');
-        reset();
-      }
-      if(p.type==='stopped'){
-        log(p.message,'error');
-        showStatus('Stopped','error');
-        reset();
-      }
+      if(p.type==='complete'){log(p.message,'success');showStatus('Search complete','success');reset();}
+      if(p.type==='stopped'){log(p.message,'error');showStatus('Stopped','error');reset();}
     };
     eventSource.onerror=()=>{log('⚠️ SSE connection lost','error');reset();}
   }catch(err){
@@ -257,7 +258,8 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
 
 function reset(){
   if(eventSource)eventSource.close();
-  startBtn.disabled=false;stopBtn.disabled=true;
+  startBtn.disabled=false;
+  stopBtn.disabled=true;
   clearTimeout(timeoutHandle);
   currentSearchId=null;
 }
@@ -265,11 +267,12 @@ stopBtn.addEventListener('click',()=>stopSearch());
 clearBtn.addEventListener('click',clearTerminal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')stopSearch();});
 
-// Global status stream
+// 🌍 Global usage tracker
 const globalSource=new EventSource('/global');
 globalSource.onmessage=e=>{
   const s=JSON.parse(e.data);
-  globalBox.textContent=`🌐 ${s.connectedUsers} online | 🔍 ${s.activeSearches} active`;
+  // show "active/10" instead of just number
+  globalBox.textContent=`🌐 ${s.connectedUsers} online | 🔍 ${s.activeSearches}/10 active`;
 };
 </script>
 </body>
