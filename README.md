@@ -1,5 +1,5 @@
-### PatternLocatorX is a utility for Minecraft that allows you to find exact coordinates based on a specific bedrock pattern in your world. By analyzing bedrock layers, it helps locate precise spots using seed-based searches.
-### Note: Download v6.4- for easier use!!!
+PatternLocatorX is a utility for Minecraft that allows you to find exact coordinates based on a specific bedrock pattern in your world. By analyzing bedrock layers, it helps locate precise spots using seed-based searches.
+#### Note: Download v6.4- for easier use!!!
 
 ## Features
 - Supports **Overworld** and **Nether** (floor and ceiling) searches.
