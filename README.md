@@ -7,17 +7,19 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - Multi-directional pattern scanning.
 - Outputs exact coordinates for matches.
 - Configurable search starting point
-- **[V6.5+ only]** Easy web-app input
+- **[WEB-V1 only]** Easy web-app input
 
 ## Requirements
 - **Zig 0.10.1**: Download from [ziglang.org](https://ziglang.org/download/).
-- **[V6.5+ only]** Install path ***MUST*** be "C:\Program Files\zig\zig.exe"
-- **[V6.5+ only]** **Node.js v14+** download from [nodejs.org](https://nodejs.org/en/download)
+- **[WEB-V1 only]** Install path ***MUST*** be "C:\Program Files\zig\zig.exe"
+- **[WEB-V1 only]** **Node.js v14+** download from [nodejs.org](https://nodejs.org/en/download)
 - **[V6.4- only]** Windows or compatible OS for running the `.bat` scripts.
 
 
 ## Usage
-**[V6.5+ only]**
+**[WEB-V1 only]**
+1. Open cmd in the tools path and type "npm install express cors"
+2. To launch the tool type "node server.js"
 
 **[V6.4- only]**
   ##### First time use : Add Zig-Path (exmpl: "C:\Users\USER\Desktop\zig-windows-x86_64-0.10.1\zig-windows-x86_64-0.10.1\zig.exe") {can be "/"}
@@ -37,7 +39,8 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - The search height is automatically set based on dimension.
 - Patterns are saved in the `Pattern-log` directory for reuse.
 - Use the startpoint system with a large pattern and a realistic range for better results.
-- DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs) 
+- DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs)
+- WEB-V1 is a lot slower than any other version [only use V6.5+ for fast searches]
 
 ## License
 This project is released under the MIT License. See `LICENSE` for details.
