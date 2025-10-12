@@ -1,9 +1,10 @@
 // ============================================================
-// PatternLocatorX - Global Web Server (Optimized Non-Lag Version)
+// PatternLocatorX - Global Web Server (Optimized + Color-Aware)
 // ============================================================
 // © 2025 ICshX | MIT License
 // - Batched SSE output (anti-lag, 500ms flush)
 // - Auto-timeout (60s)
+// - Smart color-level detection
 // - Graceful stop + cleanup
 // - Global usage tracking
 // ============================================================
@@ -53,7 +54,7 @@ const globalClients = new Set();
 const activeProcesses = new Map();
 
 // ============================================================
-// Global SSE Endpoint (for worldwide live usage)
+// Global SSE Endpoint
 // ============================================================
 app.get("/global", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -85,7 +86,7 @@ function broadcastGlobalStatus() {
 }
 
 // ============================================================
-// SSE Endpoint for search updates
+// SSE Endpoint for per-search output
 // ============================================================
 app.get("/api/search/:id", (req, res) => {
   const searchId = req.params.id;
@@ -115,7 +116,7 @@ app.get("/api/search/:id", (req, res) => {
 });
 
 // ============================================================
-// Start Search Request
+// Start Search
 // ============================================================
 app.post("/api/search/start", (req, res) => {
   const { seed, range, startX, startZ, dimension, directions, pattern } =
@@ -136,7 +137,7 @@ app.post("/api/search/start", (req, res) => {
       .json({ error: "Too many concurrent searches. Try again later." });
 
   try {
-    // Pattern file creation
+    // Pattern file
     let patternFile = null;
     if (pattern && pattern.trim()) {
       patternFile = path.join(PATTERN_DIR, `pattern_${searchId}.txt`);
@@ -144,7 +145,7 @@ app.post("/api/search/start", (req, res) => {
       console.log(`[OK] Pattern file created: ${patternFile}`);
     }
 
-    // Build arguments
+    // Build args
     const args = [seed, rangeVal.toString(), startX || "0", startZ || "0"];
     if (patternFile) args.push(patternFile);
     let dirs = directions;
@@ -182,7 +183,7 @@ app.post("/api/search/stop/:id", (req, res) => {
 });
 
 // ============================================================
-// Start Zig Process with Timeout + Buffered SSE
+// Zig Process with Batched SSE + Color Detection
 // ============================================================
 function startZigProcess(searchId, args, patternFile) {
   const info = activeProcesses.get(searchId) || { clients: [], buffer: [] };
@@ -203,14 +204,10 @@ function startZigProcess(searchId, args, patternFile) {
     info.buffer = [];
     activeProcesses.set(searchId, info);
 
-    // flush buffer every 500ms to prevent lag
-    info.flushInterval = setInterval(() => {
-      if (!info.buffer || info.buffer.length === 0) return;
-      const joined = info.buffer.splice(0, info.buffer.length).join("\n");
-      broadcast(searchId, { type: "log", level: "info", message: joined });
-    }, 500);
+    // Flush buffer every 500ms
+    info.flushInterval = setInterval(() => flushBuffer(searchId), 500);
 
-    // ⏱️ Auto-stop after 60s
+    // Auto-timeout 60s
     const timeout = setTimeout(() => {
       if (activeProcesses.has(searchId)) {
         broadcast(searchId, {
@@ -225,18 +222,18 @@ function startZigProcess(searchId, args, patternFile) {
       }
     }, 60000);
 
-    // stdout / stderr
+    // stdout / stderr handling
     child.stdout.on("data", (data) =>
-      bufferOutput(searchId, data.toString(), "info")
+      bufferOutput(searchId, data.toString())
     );
     child.stderr.on("data", (data) =>
-      bufferOutput(searchId, data.toString(), "error")
+      bufferOutput(searchId, data.toString(), true)
     );
 
     child.on("close", (code) => {
       clearTimeout(timeout);
       clearInterval(info.flushInterval);
-      flushImmediate(searchId);
+      flushBuffer(searchId);
       broadcast(searchId, {
         type: "complete",
         exitCode: code,
@@ -259,23 +256,39 @@ function startZigProcess(searchId, args, patternFile) {
 }
 
 // ============================================================
-// Buffered Output (anti-lag)
+// Buffer & Flush (smart log color detection)
 // ============================================================
-function bufferOutput(searchId, data, level) {
+function bufferOutput(searchId, data, isError = false) {
   const info = activeProcesses.get(searchId);
   if (!info) return;
   const lines = data.split("\n").filter((l) => l.trim());
   for (const line of lines) {
-    info.buffer.push(line);
-    if (info.buffer.length > 100) info.buffer.shift(); // prevent runaway memory
+    info.buffer.push({
+      msg: line.trim(),
+      level: detectLevel(line, isError),
+    });
+    if (info.buffer.length > 200) info.buffer.shift();
   }
 }
 
-function flushImmediate(searchId) {
+function flushBuffer(searchId) {
   const info = activeProcesses.get(searchId);
   if (!info || !info.buffer || info.buffer.length === 0) return;
-  const joined = info.buffer.splice(0, info.buffer.length).join("\n");
-  broadcast(searchId, { type: "log", level: "info", message: joined });
+  const logs = info.buffer.splice(0, info.buffer.length);
+  for (const l of logs) {
+    broadcast(searchId, { type: "log", level: l.level, message: l.msg });
+  }
+}
+
+// Detects log color level automatically
+function detectLevel(line, isError) {
+  const lower = line.toLowerCase();
+  if (isError || lower.includes("error") || lower.includes("fail")) return "error";
+  if (lower.includes("found") || lower.includes("success")) return "success";
+  if (lower.includes("progress") || lower.includes("%")) return "warning";
+  if (lower.includes("start") || lower.includes("launch")) return "info";
+  if (lower.includes("complete") || lower.includes("done")) return "success";
+  return "info";
 }
 
 // ============================================================
