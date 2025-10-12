@@ -1,7 +1,9 @@
 //-----------------------------------------------
 // Copyright (c) 2025 ICshX
 // Licensed under the MIT License – see LICENSE
+// Multi-threaded Version - Super Optimized
 // Added optional start-point support (center X,Z) for searches
+// Web version of PatternLocatorX
 //-----------------------------------------------
 const std = @import("std");
 const bedrock = @import("bedrock.zig");
@@ -186,7 +188,7 @@ pub fn main() anyerror!void {
         center_z = 0;
     }
 
-    std.debug.print("Center point: X = {}, Z = {}\n", .{ center_x, center_z });
+    //std.debug.print("Center point: X = {}, Z = {}\n", .{ center_x, center_z });
 
 
 
@@ -268,7 +270,7 @@ pub fn main() anyerror!void {
 
     // Print header + pattern
     std.debug.print("\n===========================================\n", .{});
-    std.debug.print("   PatternLocatorX-V5 BY ICsh (MT)\n", .{});
+    std.debug.print("   PatternLocatorX - WEB-V1 BY ICsh (MT)\n", .{});
     std.debug.print("===========================================\n", .{});
     std.debug.print("Seed: {}\n", .{seed});
     std.debug.print("Search Range: -{} to +{}\n", .{range, range});
@@ -368,18 +370,18 @@ pub fn main() anyerror!void {
             thread.join();
         }
 
-        const direction_end_time = std.time.milliTimestamp();
-        const direction_duration = @intToFloat(f64, direction_end_time - direction_start_time) / 1000.0;
+        //const direction_end_time = std.time.milliTimestamp();
+        //const direction_duration = @intToFloat(f64, direction_end_time - direction_start_time) / 1000.0;
 
-        // Final progress display for this direction
-        std.debug.print("\r", .{});
+        //Final progress display for this direction
+        //std.debug.print("\r", .{});
         var j: usize = 0;
         while (j < 120) : (j += 1) {
-            std.debug.print(" ", .{});
+            //std.debug.print(" ", .{});
         }
-        std.debug.print("\r[{s}] Progress: 100.0% | Time: ", .{directions[dir_idx]});
-        formatDuration(direction_duration);
-        std.debug.print(" | Found: {} patterns\n", .{ctx.found_count});
+        //std.debug.print("\r[{s}] Progress: 100.0% | Time: ", .{directions[dir_idx]});
+        //formatDuration(direction_duration);
+        //std.debug.print(" | Found: {} patterns\n", .{ctx.found_count});
 
         total_found += ctx.found_count;
     }
@@ -465,31 +467,31 @@ fn reportProgressThreaded(ctx: *SearchContext, completed: u64, _total: u64) void
     const filled = @floatToInt(usize, (percent / 100.0) * @intToFloat(f64, bar_width));
 
     // Clear line
-    std.debug.print("\r", .{});
+    //std.debug.print("\r", .{});
     var i: usize = 0;
     while (i < 120) : (i += 1) std.debug.print(" ", .{});
-    std.debug.print("\r", .{});
+    //std.debug.print("\r", .{});
 
-    std.debug.print("[{s}] [", .{ctx.direction});
+    //std.debug.print("[{s}] [", .{ctx.direction});
     var j: usize = 0;
     while (j < bar_width) : (j += 1) {
         if (j < filled) std.debug.print("=", .{}) else std.debug.print(" ", .{});
     }
-    std.debug.print("] ", .{});
-    std.debug.print("{d:.1}% | Time: ", .{percent});
-    formatDuration(elapsed);
+    //std.debug.print("] ", .{});
+    //std.debug.print("{d:.1}% | Time: ", .{percent});
+    //formatDuration(elapsed);
 
     // Calculate ETA
     if (elapsed > 0.0 and actual_completed < ctx.direction_total) {
         const rate = @intToFloat(f64, actual_completed) / elapsed;
         const remaining = @intToFloat(f64, ctx.direction_total - actual_completed);
         const eta_seconds = remaining / rate;
-        std.debug.print(" | ETA: ", .{});
+        //std.debug.print(" | ETA: ", .{});
         formatDuration(eta_seconds);
     }
 
     if (actual_completed == ctx.direction_total) {
-        std.debug.print(" | ETA: 0s", .{});
+        //std.debug.print(" | ETA: 0s", .{});
     }
 }
 
