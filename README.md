@@ -12,7 +12,7 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 ## Requirements
 - **Zig 0.10.1**: Download from [ziglang.org](https://ziglang.org/download/).
 - **[WEB-V1 only]** Install path ***MUST*** be "C:\Program Files\zig\zig.exe"
-- **[WEB-V1 only]** **Node.js v14+** download from [nodejs.org](https://nodejs.org/en/download)
+- **[WEB-V1 only]** **Node.js v14+**: download from [nodejs.org](https://nodejs.org/en/download).
 - **[V6.4- only]** Windows or compatible OS for running the `.bat` scripts.
 
 
