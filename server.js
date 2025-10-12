@@ -10,17 +10,31 @@ const cors = require("cors");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-// Directories
+// =====================
+// Cross-platform binary handling
+// =====================
+let exeName =
+  process.platform === "win32" ? "patternlocatorx.exe" : "patternlocatorx";
+const EXE_PATH = path.join(__dirname, exeName);
+
+// Ensure executable permissions on Linux/Render
+if (process.platform !== "win32") {
+  try {
+    fs.chmodSync(EXE_PATH, 0o755);
+    console.log("✔ patternlocatorx marked as executable");
+  } catch (err) {
+    console.warn("⚠️ Could not chmod patternlocatorx:", err.message);
+  }
+}
+
+// Pattern log directory
 const PATTERN_DIR = path.join(__dirname, "Pattern-log");
 if (!fs.existsSync(PATTERN_DIR)) fs.mkdirSync(PATTERN_DIR, { recursive: true });
 
-// Path to prebuilt Zig executable
-const EXE_PATH = path.join(__dirname, "patternlocatorx.exe");
 
 // Active processes (searchId → { child, clients })
 const activeProcesses = new Map();
