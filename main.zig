@@ -155,13 +155,13 @@ pub fn main() anyerror!void {
     };
 
     // Default + range parsing
-    var range: i32 = 5000; // default
+    var range: i32 = 1000; // default
     if (args.next()) |range_str| {
         range = std.fmt.parseInt(i32, range_str, 10) catch 5000;
     }
 
-    if (range > 10000) {
-        std.debug.print("❌ Error: Range exceeds the maximum limit (10000). Provided: {}\n", .{range});
+    if (range > 2500) {
+        std.debug.print("❌ Error: Range exceeds the maximum limit (2500). Provided: {}\n", .{range});
         return error.RangeTooLarge;
     }
 
