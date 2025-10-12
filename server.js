@@ -3,7 +3,7 @@
 // ============================================================
 // © 2025 ICshX | MIT License
 // Supports global usage tracking, safe process management,
-// and cross-platform binary handling.
+// and cross-platform binary handling with timeouts.
 // ============================================================
 
 const express = require("express");
@@ -15,13 +15,15 @@ const cors = require("cors");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// ============================================================
+// Middleware & Static
+// ============================================================
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
 // ============================================================
-// Executable detection & setup
+// Executable Detection
 // ============================================================
 const exeName =
   process.platform === "win32" ? "patternlocatorx.exe" : "patternlocatorx";
@@ -41,19 +43,15 @@ const PATTERN_DIR = path.join(__dirname, "Pattern-log");
 if (!fs.existsSync(PATTERN_DIR)) fs.mkdirSync(PATTERN_DIR, { recursive: true });
 
 // ============================================================
-// Global tracking
+// Global Tracking
 // ============================================================
 let connectedUsers = 0;
 let activeSearches = 0;
 const globalClients = new Set();
-
-// ============================================================
-// Active search processes
-// ============================================================
 const activeProcesses = new Map();
 
 // ============================================================
-// Global status SSE endpoint (for world-wide users)
+// Global SSE Endpoint (for worldwide live usage)
 // ============================================================
 app.get("/global", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -85,7 +83,7 @@ function broadcastGlobalStatus() {
 }
 
 // ============================================================
-// SSE Endpoint for each search process
+// SSE Endpoint for search process updates
 // ============================================================
 app.get("/api/search/:id", (req, res) => {
   const searchId = req.params.id;
@@ -115,19 +113,19 @@ app.get("/api/search/:id", (req, res) => {
 });
 
 // ============================================================
-// Start search
+// Start Search Request
 // ============================================================
 app.post("/api/search/start", (req, res) => {
   const { seed, range, startX, startZ, dimension, directions, pattern } = req.body;
   if (!seed) return res.status(400).json({ error: "Seed is required" });
 
   const searchId = Date.now().toString();
-  const rangeVal = parseInt(range || "10000", 10);
+  const rangeVal = parseInt(range || "1000", 10);
 
-  if (rangeVal > 10000) {
+  if (rangeVal > 3000) {
     return res
       .status(400)
-      .json({ error: `❌ Range exceeds maximum (10000): ${rangeVal}` });
+      .json({ error: `❌ Range exceeds maximum (3000): ${rangeVal}` });
   }
 
   if (activeSearches >= 10) {
@@ -137,7 +135,7 @@ app.post("/api/search/start", (req, res) => {
   }
 
   try {
-    // Write pattern file
+    // Create pattern file if needed
     let patternFile = null;
     if (pattern && pattern.trim()) {
       patternFile = path.join(PATTERN_DIR, `pattern_${searchId}.txt`);
@@ -145,14 +143,14 @@ app.post("/api/search/start", (req, res) => {
       console.log(`[OK] Pattern file created: ${patternFile}`);
     }
 
-    // Arguments for the executable
+    // Construct arguments
     const args = [seed, rangeVal.toString(), startX || "0", startZ || "0"];
     if (patternFile) args.push(patternFile);
 
     let dirs = directions;
     if (typeof dirs === "string") dirs = dirs.trim().split(/\s+/);
     if (!Array.isArray(dirs) || dirs.length === 0) dirs = ["all"];
-    args.push(dirs.join(" "));
+    args.push(dirs.join(""));
     args.push(dimension || "overworld");
 
     res.json({ searchId, status: "started" });
@@ -160,7 +158,7 @@ app.post("/api/search/start", (req, res) => {
 
     activeSearches++;
     broadcastGlobalStatus();
-    setTimeout(() => startZigProcess(searchId, args), 100);
+    setTimeout(() => startZigProcess(searchId, args, patternFile), 100);
   } catch (err) {
     console.error(`[ERROR] /api/search/start: ${err.stack || err.message}`);
     if (!res.headersSent) res.status(500).json({ error: err.message });
@@ -168,7 +166,7 @@ app.post("/api/search/start", (req, res) => {
 });
 
 // ============================================================
-// Stop search
+// Stop Search
 // ============================================================
 app.post("/api/search/stop/:id", (req, res) => {
   const searchId = req.params.id;
@@ -185,10 +183,11 @@ app.post("/api/search/stop/:id", (req, res) => {
 });
 
 // ============================================================
-// Run the Zig executable
+// Launch Zig Process with Auto-Timeout
 // ============================================================
-function startZigProcess(searchId, args) {
+function startZigProcess(searchId, args, patternFile) {
   const info = activeProcesses.get(searchId) || { clients: [] };
+
   broadcast(searchId, {
     type: "log",
     level: "info",
@@ -204,6 +203,20 @@ function startZigProcess(searchId, args) {
     info.child = child;
     activeProcesses.set(searchId, info);
 
+    // ⏱️ Auto-stop after 60s if still active
+    const timeout = setTimeout(() => {
+      if (activeProcesses.has(searchId)) {
+        broadcast(searchId, {
+          type: "stopped",
+          message: "⏰ Search timed out after 60s",
+        });
+        child.kill();
+        activeProcesses.delete(searchId);
+        activeSearches = Math.max(0, activeSearches - 1);
+        broadcastGlobalStatus();
+      }
+    }, 60000);
+
     child.stdout.on("data", (data) =>
       parseAndBroadcast(searchId, data.toString(), "info")
     );
@@ -212,6 +225,7 @@ function startZigProcess(searchId, args) {
     );
 
     child.on("close", (code) => {
+      clearTimeout(timeout);
       broadcast(searchId, {
         type: "complete",
         exitCode: code,
@@ -222,6 +236,11 @@ function startZigProcess(searchId, args) {
       });
       activeSearches = Math.max(0, activeSearches - 1);
       broadcastGlobalStatus();
+
+      // cleanup
+      if (patternFile && fs.existsSync(patternFile)) {
+        fs.unlink(patternFile, () => {});
+      }
       setTimeout(() => activeProcesses.delete(searchId), 3000);
     });
   } catch (error) {
@@ -233,7 +252,7 @@ function startZigProcess(searchId, args) {
 }
 
 // ============================================================
-// Parse and broadcast process output
+// Log Parsing & Broadcasting
 // ============================================================
 function parseAndBroadcast(searchId, output, defaultLevel = "info") {
   const lines = output.split("\n");
@@ -241,15 +260,12 @@ function parseAndBroadcast(searchId, output, defaultLevel = "info") {
     if (!line.trim()) continue;
     let level = defaultLevel;
     if (line.includes("FOUND!")) level = "success";
-    else if (line.includes("error")) level = "error";
+    else if (line.toLowerCase().includes("error")) level = "error";
     else if (line.includes("Progress")) level = "progress";
     broadcast(searchId, { type: "log", level, message: line.trim() });
   }
 }
 
-// ============================================================
-// Broadcast to all clients of one search
-// ============================================================
 function broadcast(searchId, data) {
   const info = activeProcesses.get(searchId);
   if (!info) return;
@@ -262,7 +278,7 @@ function broadcast(searchId, data) {
 }
 
 // ============================================================
-// Health check
+// Health Check
 // ============================================================
 app.get("/api/health", (req, res) => {
   res.json({
@@ -275,7 +291,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============================================================
-// Start server
+// Start Server
 // ============================================================
 app.listen(PORT, () => {
   console.log("===========================================");
@@ -287,10 +303,18 @@ app.listen(PORT, () => {
 });
 
 // ============================================================
-// Graceful shutdown
+// Graceful Shutdown
 // ============================================================
-process.on("SIGTERM", () => {
+function shutdown() {
   console.log("Gracefully shutting down...");
-  activeProcesses.forEach((p) => p.child && p.child.kill());
+  activeProcesses.forEach((p, id) => {
+    if (p.child) {
+      try {
+        p.child.kill();
+      } catch {}
+    }
+  });
   process.exit(0);
-});
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
