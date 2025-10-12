@@ -239,7 +239,7 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
     eventSource=new EventSource(`/api/search/${j.searchId}`);
 
     clearTimeout(timeoutHandle);
-    timeoutHandle=setTimeout(()=>{if(currentSearchId){stopSearch('⏰ Search timed out after 60s');}},60000);
+    timeoutHandle=setTimeout(()=>{if(currentSearchId){stopSearch('⏰ Search timed out after 2min');}},120000);
 
     eventSource.onmessage=e=>{
       const p=JSON.parse(e.data);
@@ -277,3 +277,4 @@ globalSource.onmessage=e=>{
 </script>
 </body>
 </html>
+
