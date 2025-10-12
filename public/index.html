@@ -5,146 +5,99 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PatternLocatorX 🌍</title>
 <style>
-/* ======= Layout & Design ======= */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-  padding: 20px;
-  color: #333;
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  min-height:100vh;padding:20px;color:#333
 }
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 20px;
-  height: calc(100vh - 40px);
+.container{
+  max-width:1200px;margin:0 auto;
+  display:grid;grid-template-columns:400px 1fr;
+  gap:20px;height:calc(100vh - 40px)
 }
-.sidebar {
-  background: #fff;
-  border-radius: 15px;
-  padding: 30px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  overflow-y: auto;
+.sidebar{
+  background:#fff;border-radius:15px;padding:30px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.3);overflow-y:auto
 }
-.terminal-container {
-  background: #1a1d23;
-  border-radius: 15px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+.terminal-container{
+  background:#1a1d23;border-radius:15px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  display:flex;flex-direction:column;overflow:hidden
 }
-.terminal-header {
-  background: #2d3139;
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid #3d4149;
+.terminal-header{
+  background:#2d3139;padding:12px 20px;
+  display:flex;align-items:center;gap:8px;
+  border-bottom:1px solid #3d4149
 }
-.terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
-.dot-red { background: #ff5f56; }
-.dot-yellow { background: #ffbd2e; }
-.dot-green { background: #27c93f; }
-.terminal-title { color: #8b949e; font-size: 0.9em; margin-left: 10px; }
-.terminal-output {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  font-family: Consolas, monospace;
-  font-size: 13px;
-  color: #c9d1d9;
+.terminal-dot{width:12px;height:12px;border-radius:50%}
+.dot-red{background:#ff5f56}
+.dot-yellow{background:#ffbd2e}
+.dot-green{background:#27c93f}
+.terminal-title{color:#8b949e;font-size:0.9em;margin-left:10px}
+.terminal-output{
+  flex:1;padding:20px;overflow-y:auto;
+  font-family:Consolas,monospace;font-size:13px;color:#c9d1d9
 }
-.terminal-output::-webkit-scrollbar { width: 10px; }
-.terminal-output::-webkit-scrollbar-thumb {
-  background: #3d4149;
-  border-radius: 5px;
+.terminal-output::-webkit-scrollbar{width:10px}
+.terminal-output::-webkit-scrollbar-thumb{background:#3d4149;border-radius:5px}
+h1{
+  font-size:1.8em;margin-bottom:10px;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent
 }
-h1 {
-  font-size: 1.8em;
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.subtitle{color:#666;margin-bottom:25px;font-size:0.9em}
+.form-group{margin-bottom:20px}
+label{display:block;font-weight:600;margin-bottom:6px;color:#555;font-size:0.9em}
+input,select,textarea{
+  width:100%;padding:10px 12px;border:2px solid #e0e0e0;
+  border-radius:8px;font-size:0.95em;transition:0.3s
 }
-.subtitle { color: #666; margin-bottom: 25px; font-size: 0.9em; }
-
-/* ======= Form Controls ======= */
-.form-group { margin-bottom: 20px; }
-label { display: block; font-weight: 600; margin-bottom: 6px; color: #555; font-size: 0.9em; }
-input, select, textarea {
-  width: 100%; padding: 10px 12px;
-  border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.95em;
-  transition: 0.3s;
+input:focus,select:focus,textarea:focus{
+  border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,0.1)
 }
-input:focus, select:focus, textarea:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+textarea{font-family:Consolas,monospace;resize:vertical;min-height:80px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.checkbox-group{display:flex;gap:15px;flex-wrap:wrap}
+.checkbox-item{display:flex;align-items:center;gap:6px}
+button{
+  width:100%;padding:14px;font-size:1em;font-weight:600;
+  border:none;border-radius:8px;cursor:pointer;transition:0.3s
 }
-textarea { font-family: Consolas, monospace; resize: vertical; min-height: 80px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-.checkbox-group { display: flex; gap: 15px; flex-wrap: wrap; }
-.checkbox-item { display: flex; align-items: center; gap: 6px; }
-
-button {
-  width: 100%;
-  padding: 14px;
-  font-size: 1em;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.3s;
+.btn-primary{
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  color:white;box-shadow:0 4px 15px rgba(102,126,234,0.4);
+  margin-bottom:12px
 }
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(102,126,234,0.4);
-  margin-bottom: 12px;
+.btn-primary:hover:not(:disabled){
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(102,126,234,0.6)
 }
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102,126,234,0.6);
+.btn-secondary{background:#6c757d;color:#fff;margin-bottom:12px}
+.btn-secondary:hover{background:#5a6268}
+.status{
+  padding:10px;border-radius:8px;margin-bottom:15px;
+  font-size:0.9em;display:none
 }
-.btn-secondary {
-  background: #6c757d;
-  color: #fff;
-  margin-bottom: 12px;
+.status.info{background:#e3f2fd;color:#1976d2;border-left:4px solid #1976d2}
+.status.success{background:#e8f5e9;color:#388e3c;border-left:4px solid #388e3c}
+.status.error{background:#ffebee;color:#c62828;border-left:4px solid #c62828}
+.log-line{margin:2px 0;white-space:pre-wrap}
+.log-info{color:#58a6ff}
+.log-success{color:#3fb950}
+.log-warning{color:#f0883e}
+.log-error{color:#f85149}
+.log-dim{color:#8b949e}
+#globalStatus{
+  position:fixed;bottom:15px;right:15px;
+  background:rgba(0,0,0,0.7);color:#fff;font-size:13px;
+  padding:6px 12px;border-radius:8px;
+  box-shadow:0 0 10px rgba(0,0,0,0.3);
+  font-family:monospace
 }
-.btn-secondary:hover { background: #5a6268; }
-
-/* ======= Status Messages ======= */
-.status {
-  padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9em; display: none;
-}
-.status.info { background: #e3f2fd; color: #1976d2; border-left: 4px solid #1976d2; }
-.status.success { background: #e8f5e9; color: #388e3c; border-left: 4px solid #388e3c; }
-.status.error { background: #ffebee; color: #c62828; border-left: 4px solid #c62828; }
-
-/* ======= Terminal log colors ======= */
-.log-line { margin: 2px 0; white-space: pre-wrap; }
-.log-info { color: #58a6ff; }
-.log-success { color: #3fb950; }
-.log-warning { color: #f0883e; }
-.log-error { color: #f85149; }
-.log-dim { color: #8b949e; }
-
-/* ======= Global footer (users & searches) ======= */
-#globalStatus {
-  position: fixed; bottom: 15px; right: 15px;
-  background: rgba(0,0,0,0.7);
-  color: #fff; font-size: 13px;
-  padding: 6px 12px; border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-  font-family: monospace;
-}
-@media (max-width: 1024px) {
-  .container { grid-template-columns: 1fr; height: auto; }
-  .terminal-container { min-height: 400px; }
+@media(max-width:1024px){
+  .container{grid-template-columns:1fr;height:auto}
+  .terminal-container{min-height:400px}
 }
 </style>
 </head>
@@ -226,21 +179,22 @@ const stopBtn=document.getElementById('stopBtn');
 const clearBtn=document.getElementById('clearBtn');
 const statusBox=document.getElementById('status');
 const globalBox=document.getElementById('globalStatus');
-
 let currentSearchId=null;
 let eventSource=null;
+let timeoutHandle=null;
 
 function log(msg,type='info'){const l=document.createElement('div');l.className=`log-line log-${type}`;l.textContent=msg;term.appendChild(l);term.scrollTop=term.scrollHeight;}
 function clearTerminal(){term.innerHTML='<div class="log-dim">Terminal cleared.</div>';}
 function showStatus(msg,type){statusBox.textContent=msg;statusBox.className=`status ${type}`;statusBox.style.display='block';}
 
-async function stopSearch(){
+async function stopSearch(reason='User stopped'){
   if(!currentSearchId)return;
   await fetch(`/api/search/stop/${currentSearchId}`,{method:'POST'});
   if(eventSource)eventSource.close();
-  log('⛔ Search stopped by user','warning');
-  showStatus('Search stopped','error');
+  log(`⛔ ${reason}`,'warning');
+  showStatus(reason,'error');
   startBtn.disabled=false;stopBtn.disabled=true;
+  clearTimeout(timeoutHandle);
   currentSearchId=null;
 }
 
@@ -266,14 +220,32 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
     const res=await fetch('/api/search/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const j=await res.json();
     if(!res.ok)throw new Error(j.error||'Server error');
-    currentSearchId=j.searchId;log(`Started search ${j.searchId}`,'highlight');
+    currentSearchId=j.searchId;
+    log(`Started search ${j.searchId}`,'highlight');
     eventSource=new EventSource(`/api/search/${j.searchId}`);
+
+    // ⏱ Auto-timeout after 60 seconds
+    clearTimeout(timeoutHandle);
+    timeoutHandle=setTimeout(()=>{
+      if(currentSearchId){
+        stopSearch('⏰ Search timed out after 60s');
+      }
+    },60000);
+
     eventSource.onmessage=e=>{
       const p=JSON.parse(e.data);
       if(!p)return;
       if(p.type==='log')log(p.message,p.level||'info');
-      if(p.type==='complete'){log(p.message,'success');showStatus('Search complete','success');reset();}
-      if(p.type==='stopped'){log(p.message,'error');showStatus('Stopped','error');reset();}
+      if(p.type==='complete'){
+        log(p.message,'success');
+        showStatus('Search complete','success');
+        reset();
+      }
+      if(p.type==='stopped'){
+        log(p.message,'error');
+        showStatus('Stopped','error');
+        reset();
+      }
     };
     eventSource.onerror=()=>{log('⚠️ SSE connection lost','error');reset();}
   }catch(err){
@@ -283,11 +255,17 @@ document.getElementById('searchForm').addEventListener('submit',async e=>{
   }
 });
 
-function reset(){if(eventSource)eventSource.close();startBtn.disabled=false;stopBtn.disabled=true;currentSearchId=null;}
-stopBtn.addEventListener('click',stopSearch);
+function reset(){
+  if(eventSource)eventSource.close();
+  startBtn.disabled=false;stopBtn.disabled=true;
+  clearTimeout(timeoutHandle);
+  currentSearchId=null;
+}
+stopBtn.addEventListener('click',()=>stopSearch());
 clearBtn.addEventListener('click',clearTerminal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')stopSearch();});
 
+// Global status stream
 const globalSource=new EventSource('/global');
 globalSource.onmessage=e=>{
   const s=JSON.parse(e.data);
