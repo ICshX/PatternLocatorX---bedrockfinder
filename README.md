@@ -18,7 +18,7 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 
 ## Usage
 **[WEB-V1 only]**
-- Open cmd in the tools path and type "**npm install express cors**"(on first launch only)
+- Open cmd in the tools path and type "**npm install express cors**" (on first launch only)
 - To launch the tool type "**node server.js**"
 
 **[V6.4- only]**
