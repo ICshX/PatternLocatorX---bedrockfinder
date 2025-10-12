@@ -153,10 +153,17 @@ pub fn main() anyerror!void {
         std.debug.print("Usage: bedrock_finder <seed> <range> [start_x start_z] [pattern_file] [dirs] [dimension]\n", .{});
         return error.NotEnoughArgs;
     };
-    const range_str = args.next() orelse {
-        std.debug.print("Usage: bedrock_finder <seed> <range> [start_x start_z] [pattern_file] [dirs] [dimension]\n", .{});
-        return error.NotEnoughArgs;
-    };
+
+    // Default + range parsing
+    var range: i32 = 5000; // default
+    if (args.next()) |range_str| {
+        range = std.fmt.parseInt(i32, range_str, 10) catch 5000;
+    }
+
+    if (range > 10000) {
+        std.debug.print("❌ Error: Range exceeds the maximum limit (10000). Provided: {}\n", .{range});
+        return error.RangeTooLarge;
+    }
 
     // optional: start_x, start_z, pattern_file, dirs, dimension
     var start_x_arg = args.next();
@@ -166,7 +173,6 @@ pub fn main() anyerror!void {
     const dim_arg = args.next() orelse "overworld";
 
     const seed = try std.fmt.parseInt(i64, seed_str, 10);
-    const range = try std.fmt.parseInt(i32, range_str, 10);
 
     // Parse optional start point if both provided, else default to 0,0
     var center_x: i32 = 0;
@@ -179,16 +185,8 @@ pub fn main() anyerror!void {
             const sz = parseInt(i32, sz_str, 10) catch 0;
             center_x = sx;
             center_z = sz;
-        } else {
-            center_x = 0;
-            center_z = 0;
         }
-    } else {
-        center_x = 0;
-        center_z = 0;
     }
-
-    //std.debug.print("Center point: X = {}, Z = {}\n", .{ center_x, center_z });
 
     // OPTIMIZATION: Intelligent thread count based on workload
     var num_threads = try Thread.getCpuCount();
@@ -206,7 +204,7 @@ pub fn main() anyerror!void {
         return error.InvalidDimension;
     }
 
-    // Load pattern: either from file or default
+    // Pattern laden
     var pattern: FlexiblePattern = undefined;
     if (pattern_file_path) |pf| {
         var contents = try std.fs.cwd().readFileAlloc(allocator, pf, 10 * 1024 * 1024);
