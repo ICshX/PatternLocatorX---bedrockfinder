@@ -1,9 +1,11 @@
 // ============================================================
-// PatternLocatorX - Global Web Server (Render + Local Ready)
+// PatternLocatorX - Global Web Server (Optimized Non-Lag Version)
 // ============================================================
 // © 2025 ICshX | MIT License
-// Supports global usage tracking, safe process management,
-// and cross-platform binary handling with timeouts.
+// - Batched SSE output (anti-lag, 500ms flush)
+// - Auto-timeout (60s)
+// - Graceful stop + cleanup
+// - Global usage tracking
 // ============================================================
 
 const express = require("express");
@@ -83,7 +85,7 @@ function broadcastGlobalStatus() {
 }
 
 // ============================================================
-// SSE Endpoint for search process updates
+// SSE Endpoint for search updates
 // ============================================================
 app.get("/api/search/:id", (req, res) => {
   const searchId = req.params.id;
@@ -95,7 +97,7 @@ app.get("/api/search/:id", (req, res) => {
   res.write(`data: ${JSON.stringify({ type: "connected", searchId })}\n\n`);
 
   if (!activeProcesses.has(searchId))
-    activeProcesses.set(searchId, { clients: [] });
+    activeProcesses.set(searchId, { clients: [], buffer: [] });
   activeProcesses.get(searchId).clients.push(res);
 
   req.on("close", () => {
@@ -116,26 +118,25 @@ app.get("/api/search/:id", (req, res) => {
 // Start Search Request
 // ============================================================
 app.post("/api/search/start", (req, res) => {
-  const { seed, range, startX, startZ, dimension, directions, pattern } = req.body;
+  const { seed, range, startX, startZ, dimension, directions, pattern } =
+    req.body;
   if (!seed) return res.status(400).json({ error: "Seed is required" });
 
   const searchId = Date.now().toString();
   const rangeVal = parseInt(range || "1000", 10);
 
-  if (rangeVal > 3000) {
+  if (rangeVal > 3000)
     return res
       .status(400)
       .json({ error: `❌ Range exceeds maximum (3000): ${rangeVal}` });
-  }
 
-  if (activeSearches >= 10) {
+  if (activeSearches >= 10)
     return res
       .status(429)
       .json({ error: "Too many concurrent searches. Try again later." });
-  }
 
   try {
-    // Create pattern file if needed
+    // Pattern file creation
     let patternFile = null;
     if (pattern && pattern.trim()) {
       patternFile = path.join(PATTERN_DIR, `pattern_${searchId}.txt`);
@@ -143,10 +144,9 @@ app.post("/api/search/start", (req, res) => {
       console.log(`[OK] Pattern file created: ${patternFile}`);
     }
 
-    // Construct arguments
+    // Build arguments
     const args = [seed, rangeVal.toString(), startX || "0", startZ || "0"];
     if (patternFile) args.push(patternFile);
-
     let dirs = directions;
     if (typeof dirs === "string") dirs = dirs.trim().split(/\s+/);
     if (!Array.isArray(dirs) || dirs.length === 0) dirs = ["all"];
@@ -155,7 +155,6 @@ app.post("/api/search/start", (req, res) => {
 
     res.json({ searchId, status: "started" });
     console.log(`[INFO] Starting search ${searchId}`);
-
     activeSearches++;
     broadcastGlobalStatus();
     setTimeout(() => startZigProcess(searchId, args, patternFile), 100);
@@ -183,10 +182,10 @@ app.post("/api/search/stop/:id", (req, res) => {
 });
 
 // ============================================================
-// Launch Zig Process with Auto-Timeout
+// Start Zig Process with Timeout + Buffered SSE
 // ============================================================
 function startZigProcess(searchId, args, patternFile) {
-  const info = activeProcesses.get(searchId) || { clients: [] };
+  const info = activeProcesses.get(searchId) || { clients: [], buffer: [] };
 
   broadcast(searchId, {
     type: "log",
@@ -201,9 +200,17 @@ function startZigProcess(searchId, args, patternFile) {
     });
 
     info.child = child;
+    info.buffer = [];
     activeProcesses.set(searchId, info);
 
-    // ⏱️ Auto-stop after 60s if still active
+    // flush buffer every 500ms to prevent lag
+    info.flushInterval = setInterval(() => {
+      if (!info.buffer || info.buffer.length === 0) return;
+      const joined = info.buffer.splice(0, info.buffer.length).join("\n");
+      broadcast(searchId, { type: "log", level: "info", message: joined });
+    }, 500);
+
+    // ⏱️ Auto-stop after 60s
     const timeout = setTimeout(() => {
       if (activeProcesses.has(searchId)) {
         broadcast(searchId, {
@@ -211,21 +218,25 @@ function startZigProcess(searchId, args, patternFile) {
           message: "⏰ Search timed out after 60s",
         });
         child.kill();
+        clearInterval(info.flushInterval);
         activeProcesses.delete(searchId);
         activeSearches = Math.max(0, activeSearches - 1);
         broadcastGlobalStatus();
       }
     }, 60000);
 
+    // stdout / stderr
     child.stdout.on("data", (data) =>
-      parseAndBroadcast(searchId, data.toString(), "info")
+      bufferOutput(searchId, data.toString(), "info")
     );
     child.stderr.on("data", (data) =>
-      parseAndBroadcast(searchId, data.toString(), "error")
+      bufferOutput(searchId, data.toString(), "error")
     );
 
     child.on("close", (code) => {
       clearTimeout(timeout);
+      clearInterval(info.flushInterval);
+      flushImmediate(searchId);
       broadcast(searchId, {
         type: "complete",
         exitCode: code,
@@ -236,41 +247,45 @@ function startZigProcess(searchId, args, patternFile) {
       });
       activeSearches = Math.max(0, activeSearches - 1);
       broadcastGlobalStatus();
-
-      // cleanup
-      if (patternFile && fs.existsSync(patternFile)) {
-        fs.unlink(patternFile, () => {});
-      }
+      if (patternFile && fs.existsSync(patternFile)) fs.unlink(patternFile, () => {});
       setTimeout(() => activeProcesses.delete(searchId), 3000);
     });
-  } catch (error) {
+  } catch (err) {
     broadcast(searchId, {
       type: "error",
-      message: `Failed to run EXE: ${error.message}`,
+      message: `Failed to run EXE: ${err.message}`,
     });
   }
 }
 
 // ============================================================
-// Log Parsing & Broadcasting
+// Buffered Output (anti-lag)
 // ============================================================
-function parseAndBroadcast(searchId, output, defaultLevel = "info") {
-  const lines = output.split("\n");
+function bufferOutput(searchId, data, level) {
+  const info = activeProcesses.get(searchId);
+  if (!info) return;
+  const lines = data.split("\n").filter((l) => l.trim());
   for (const line of lines) {
-    if (!line.trim()) continue;
-    let level = defaultLevel;
-    if (line.includes("FOUND!")) level = "success";
-    else if (line.toLowerCase().includes("error")) level = "error";
-    else if (line.includes("Progress")) level = "progress";
-    broadcast(searchId, { type: "log", level, message: line.trim() });
+    info.buffer.push(line);
+    if (info.buffer.length > 100) info.buffer.shift(); // prevent runaway memory
   }
 }
 
+function flushImmediate(searchId) {
+  const info = activeProcesses.get(searchId);
+  if (!info || !info.buffer || info.buffer.length === 0) return;
+  const joined = info.buffer.splice(0, info.buffer.length).join("\n");
+  broadcast(searchId, { type: "log", level: "info", message: joined });
+}
+
+// ============================================================
+// SSE Broadcast Helper
+// ============================================================
 function broadcast(searchId, data) {
   const info = activeProcesses.get(searchId);
   if (!info) return;
   const msg = `data: ${JSON.stringify(data)}\n\n`;
-  for (const client of info.clients) {
+  for (const client of info.clients || []) {
     try {
       client.write(msg);
     } catch {}
@@ -307,7 +322,8 @@ app.listen(PORT, () => {
 // ============================================================
 function shutdown() {
   console.log("Gracefully shutting down...");
-  activeProcesses.forEach((p, id) => {
+  activeProcesses.forEach((p) => {
+    clearInterval(p.flushInterval);
     if (p.child) {
       try {
         p.child.kill();
