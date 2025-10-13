@@ -23,15 +23,15 @@ const PORT = process.env.PORT || 3000;
 // Middleware & Static (🚀 supports large patterns)
 // ============================================================
 app.use(cors());
-app.use(express.json({ limit: "50mb" })); // large pattern-safe
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "1mb" })); // large pattern-safe
+app.use(express.urlencoded({ limit: "1mb", extended: true }));
 app.use(express.static("public"));
 
-// Optional: Reject absurdly large uploads (>50MB)
+// Optional: Reject absurdly large uploads (>1MB)
 app.use((req, res, next) => {
   const len = parseInt(req.headers["content-length"] || "0", 10);
-  if (len > 50 * 1024 * 1024) {
-    return res.status(413).json({ error: "❌ Pattern too large (max 50MB)" });
+  if (len > 1 * 1024 * 1024) {
+    return res.status(413).json({ error: "❌ Pattern too large (max 1MB)" });
   }
   next();
 });
@@ -361,3 +361,4 @@ function shutdown() {
 }
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+
