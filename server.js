@@ -8,6 +8,7 @@
 // - Smart color-level detection
 // - Graceful stop + cleanup
 // - Global usage tracking
+// - Preserves exact stdout whitespace (no trimming)
 // ============================================================
 
 const express = require("express");
@@ -23,15 +24,15 @@ const PORT = process.env.PORT || 3000;
 // Middleware & Static (🚀 supports large patterns)
 // ============================================================
 app.use(cors());
-app.use(express.json({ limit: "1mb" })); // large pattern-safe
-app.use(express.urlencoded({ limit: "1mb", extended: true }));
+app.use(express.json({ limit: "50mb" })); // large pattern-safe
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.static("public"));
 
-// Optional: Reject absurdly large uploads (>1MB)
+// Optional: Reject absurdly large uploads (>50MB)
 app.use((req, res, next) => {
   const len = parseInt(req.headers["content-length"] || "0", 10);
-  if (len > 1 * 1024 * 1024) {
-    return res.status(413).json({ error: "❌ Pattern too large (max 1MB)" });
+  if (len > 50 * 1024 * 1024) {
+    return res.status(413).json({ error: "❌ Pattern too large (max 50MB)" });
   }
   next();
 });
@@ -109,7 +110,7 @@ app.get("/api/search/:id", (req, res) => {
   res.write(`data: ${JSON.stringify({ type: "connected", searchId })}\n\n`);
 
   if (!activeProcesses.has(searchId))
-    activeProcesses.set(searchId, { clients: [], buffer: [] });
+    activeProcesses.set(searchId, { clients: [], buffer: [], partial: "" });
   activeProcesses.get(searchId).clients.push(res);
 
   req.on("close", () => {
@@ -117,7 +118,7 @@ app.get("/api/search/:id", (req, res) => {
     if (info) {
       info.clients = info.clients.filter((c) => c !== res);
       if (info.clients.length === 0 && info.child) {
-        info.child.kill();
+        try { info.child.kill(); } catch {}
         activeProcesses.delete(searchId);
         activeSearches = Math.max(0, activeSearches - 1);
         broadcastGlobalStatus();
@@ -188,7 +189,7 @@ app.post("/api/search/stop/:id", (req, res) => {
   const searchId = req.params.id;
   const info = activeProcesses.get(searchId);
   if (info && info.child) {
-    info.child.kill();
+    try { info.child.kill(); } catch {}
     broadcast(searchId, { type: "stopped", message: "Search stopped by user" });
     activeProcesses.delete(searchId);
     activeSearches = Math.max(0, activeSearches - 1);
@@ -202,7 +203,7 @@ app.post("/api/search/stop/:id", (req, res) => {
 // Zig Process with Batched SSE + Color Detection
 // ============================================================
 function startZigProcess(searchId, args, patternFile) {
-  const info = activeProcesses.get(searchId) || { clients: [], buffer: [] };
+  const info = activeProcesses.get(searchId) || { clients: [], buffer: [], partial: "" };
 
   broadcast(searchId, {
     type: "log",
@@ -217,7 +218,8 @@ function startZigProcess(searchId, args, patternFile) {
     });
 
     info.child = child;
-    info.buffer = [];
+    info.buffer = info.buffer || [];
+    info.partial = info.partial || "";
     activeProcesses.set(searchId, info);
 
     // Flush buffer every 500ms
@@ -230,7 +232,7 @@ function startZigProcess(searchId, args, patternFile) {
           type: "stopped",
           message: "⏰ Search timed out after 60s",
         });
-        child.kill();
+        try { child.kill(); } catch {}
         clearInterval(info.flushInterval);
         activeProcesses.delete(searchId);
         activeSearches = Math.max(0, activeSearches - 1);
@@ -240,13 +242,21 @@ function startZigProcess(searchId, args, patternFile) {
 
     // stdout / stderr handling
     child.stdout.on("data", (data) => bufferOutput(searchId, data.toString()));
-    child.stderr.on("data", (data) =>
-      bufferOutput(searchId, data.toString(), true)
-    );
+    child.stderr.on("data", (data) => bufferOutput(searchId, data.toString(), true));
 
     child.on("close", (code) => {
       clearTimeout(timeout);
       clearInterval(info.flushInterval);
+
+      // flush any remaining partial line
+      if (info.partial && info.partial.length > 0) {
+        info.buffer.push({
+          msg: info.partial,
+          level: detectLevel(info.partial, false),
+        });
+        info.partial = "";
+      }
+
       flushBuffer(searchId);
       broadcast(searchId, {
         type: "complete",
@@ -258,10 +268,14 @@ function startZigProcess(searchId, args, patternFile) {
       });
       activeSearches = Math.max(0, activeSearches - 1);
       broadcastGlobalStatus();
-      if (patternFile && fs.existsSync(patternFile))
-        fs.unlink(patternFile, () => {});
+      if (patternFile && fs.existsSync(patternFile)) fs.unlink(patternFile, () => {});
       setTimeout(() => activeProcesses.delete(searchId), 3000);
     });
+
+    child.on("error", (err) => {
+      broadcast(searchId, { type: "error", message: `Child process error: ${err.message}` });
+    });
+
   } catch (err) {
     broadcast(searchId, {
       type: "error",
@@ -271,18 +285,33 @@ function startZigProcess(searchId, args, patternFile) {
 }
 
 // ============================================================
-// Buffer & Flush (smart log color detection)
+// Buffer & Flush (smart log color detection, preserves whitespace)
 // ============================================================
+// Important: we do NOT trim lines. We must preserve leading/trailing spaces.
+
 function bufferOutput(searchId, data, isError = false) {
   const info = activeProcesses.get(searchId);
   if (!info) return;
-  const lines = data.split("\n").filter((l) => l.trim());
-  for (const line of lines) {
+
+  // ensure partial exists
+  info.partial = info.partial || "";
+
+  // Prepend partial from previous chunk
+  let text = info.partial + data;
+  // Split on CRLF or LF
+  const parts = text.split(/\r?\n/);
+
+  // The last part may be an incomplete line -> keep as partial
+  info.partial = parts.pop();
+
+  for (const part of parts) {
+    // push the line exactly as-is (no trim)
     info.buffer.push({
-      msg: line.trim(),
-      level: detectLevel(line, isError),
+      msg: part, // preserve exact whitespace
+      level: detectLevel(part, isError),
     });
-    if (info.buffer.length > 200) info.buffer.shift();
+    // keep buffer bounded (prevent memory explosion)
+    if (info.buffer.length > 2000) info.buffer.shift();
   }
 }
 
@@ -295,11 +324,12 @@ function flushBuffer(searchId) {
   }
 }
 
+// Detects log color level automatically (simple heuristics)
 function detectLevel(line, isError) {
-  const lower = line.toLowerCase();
+  const lower = (line || "").toLowerCase();
   if (isError || lower.includes("error") || lower.includes("fail")) return "error";
-  if (lower.includes("found") || lower.includes("success")) return "success";
-  if (lower.includes("progress") || lower.includes("%")) return "warning";
+  if (lower.includes("found") || lower.includes("success") || lower.includes("search complete")) return "success";
+  if (lower.includes("progress") || lower.includes("%") || lower.includes("searching")) return "warning";
   if (lower.includes("start") || lower.includes("launch")) return "info";
   if (lower.includes("complete") || lower.includes("done")) return "success";
   return "info";
@@ -311,6 +341,7 @@ function detectLevel(line, isError) {
 function broadcast(searchId, data) {
   const info = activeProcesses.get(searchId);
   if (!info) return;
+  // JSON.stringify preserves internal spaces in strings
   const msg = `data: ${JSON.stringify(data)}\n\n`;
   for (const client of info.clients || []) {
     try {
@@ -361,4 +392,3 @@ function shutdown() {
 }
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
-
