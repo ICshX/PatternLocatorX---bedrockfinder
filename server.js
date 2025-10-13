@@ -2,6 +2,7 @@
 // PatternLocatorX - Global Web Server (Optimized + Color-Aware)
 // ============================================================
 // © 2025 ICshX | MIT License
+// - Large pattern-safe JSON body (50MB)
 // - Batched SSE output (anti-lag, 500ms flush)
 // - Auto-timeout (60s)
 // - Smart color-level detection
@@ -19,11 +20,21 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================================
-// Middleware & Static
+// Middleware & Static (🚀 supports large patterns)
 // ============================================================
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" })); // large pattern-safe
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.static("public"));
+
+// Optional: Reject absurdly large uploads (>50MB)
+app.use((req, res, next) => {
+  const len = parseInt(req.headers["content-length"] || "0", 10);
+  if (len > 50 * 1024 * 1024) {
+    return res.status(413).json({ error: "❌ Pattern too large (max 50MB)" });
+  }
+  next();
+});
 
 // ============================================================
 // Executable Detection
@@ -119,35 +130,39 @@ app.get("/api/search/:id", (req, res) => {
 // Start Search
 // ============================================================
 app.post("/api/search/start", (req, res) => {
-  const { seed, range, startX, startZ, dimension, directions, pattern } =
-    req.body;
-  if (!seed) return res.status(400).json({ error: "Seed is required" });
-
-  const searchId = Date.now().toString();
-  const rangeVal = parseInt(range || "1000", 10);
-
-  if (rangeVal > 3000)
-    return res
-      .status(400)
-      .json({ error: `❌ Range exceeds maximum (3000): ${rangeVal}` });
-
-  if (activeSearches >= 10)
-    return res
-      .status(429)
-      .json({ error: "Too many concurrent searches. Try again later." });
-
   try {
-    // Pattern file
+    const { seed, range, startX, startZ, dimension, directions, pattern } =
+      req.body;
+
+    if (!seed) return res.status(400).json({ error: "Seed is required" });
+
+    const searchId = Date.now().toString();
+    const rangeVal = parseInt(range || "1000", 10);
+
+    if (rangeVal > 3000)
+      return res
+        .status(400)
+        .json({ error: `❌ Range exceeds maximum (3000): ${rangeVal}` });
+
+    if (activeSearches >= 10)
+      return res
+        .status(429)
+        .json({ error: "Too many concurrent searches. Try again later." });
+
+    // Handle pattern safely
     let patternFile = null;
-    if (pattern && pattern.trim()) {
+    if (pattern && typeof pattern === "string" && pattern.trim()) {
       patternFile = path.join(PATTERN_DIR, `pattern_${searchId}.txt`);
       fs.writeFileSync(patternFile, pattern, "utf8");
-      console.log(`[OK] Pattern file created: ${patternFile}`);
+      console.log(`[OK] Pattern file created: ${patternFile} (${pattern.length} bytes)`);
+    } else {
+      console.warn("[WARN] Empty or invalid pattern input");
     }
 
     // Build args
     const args = [seed, rangeVal.toString(), startX || "0", startZ || "0"];
     if (patternFile) args.push(patternFile);
+
     let dirs = directions;
     if (typeof dirs === "string") dirs = dirs.trim().split(/\s+/);
     if (!Array.isArray(dirs) || dirs.length === 0) dirs = ["all"];
@@ -158,6 +173,7 @@ app.post("/api/search/start", (req, res) => {
     console.log(`[INFO] Starting search ${searchId}`);
     activeSearches++;
     broadcastGlobalStatus();
+
     setTimeout(() => startZigProcess(searchId, args, patternFile), 100);
   } catch (err) {
     console.error(`[ERROR] /api/search/start: ${err.stack || err.message}`);
@@ -223,9 +239,7 @@ function startZigProcess(searchId, args, patternFile) {
     }, 60000);
 
     // stdout / stderr handling
-    child.stdout.on("data", (data) =>
-      bufferOutput(searchId, data.toString())
-    );
+    child.stdout.on("data", (data) => bufferOutput(searchId, data.toString()));
     child.stderr.on("data", (data) =>
       bufferOutput(searchId, data.toString(), true)
     );
@@ -244,7 +258,8 @@ function startZigProcess(searchId, args, patternFile) {
       });
       activeSearches = Math.max(0, activeSearches - 1);
       broadcastGlobalStatus();
-      if (patternFile && fs.existsSync(patternFile)) fs.unlink(patternFile, () => {});
+      if (patternFile && fs.existsSync(patternFile))
+        fs.unlink(patternFile, () => {});
       setTimeout(() => activeProcesses.delete(searchId), 3000);
     });
   } catch (err) {
@@ -280,7 +295,6 @@ function flushBuffer(searchId) {
   }
 }
 
-// Detects log color level automatically
 function detectLevel(line, isError) {
   const lower = line.toLowerCase();
   if (isError || lower.includes("error") || lower.includes("fail")) return "error";
