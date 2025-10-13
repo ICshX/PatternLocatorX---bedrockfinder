@@ -56,7 +56,18 @@ input,select,textarea{
 input:focus,select:focus,textarea:focus{
   border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,0.1)
 }
-textarea{font-family:Consolas,monospace;resize:vertical;min-height:80px}
+
+/* 🔧 überarbeitetes Textfeld für Pattern */
+textarea {
+  font-family: Consolas, monospace;
+  white-space: pre;
+  overflow: auto;
+  width: 100%;
+  height: 300px;
+  resize: both;
+  tab-size: 2;
+}
+
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .checkbox-group{display:flex;gap:15px;flex-wrap:wrap}
 .checkbox-item{display:flex;align-items:center;gap:6px}
@@ -183,7 +194,6 @@ button{
   </div>
 </div>
 
-<!-- 🌐 Status + GitHub link -->
 <div id="globalStatus">🌐 Connecting...</div>
 <a class="github-link" href="https://github.com/ICshX/PatternLocatorX" target="_blank" rel="noopener">💻 GitHub ↗</a>
 
@@ -282,7 +292,6 @@ stopBtn.addEventListener('click',()=>stopSearch());
 clearBtn.addEventListener('click',clearTerminal);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')stopSearch();});
 
-// 🌍 Global usage tracker
 const globalSource=new EventSource('/global');
 globalSource.onmessage=e=>{
   const s=JSON.parse(e.data);
@@ -291,5 +300,3 @@ globalSource.onmessage=e=>{
 </script>
 </body>
 </html>
-
-
