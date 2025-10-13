@@ -41,6 +41,7 @@ PatternLocatorX is a utility for Minecraft that allows you to find exact coordin
 - Patterns are saved in the `Pattern-log` directory for reuse.
 - Use the startpoint system with a large pattern and a realistic range for better results.
 - DO NOT USE THE TERMINAL IN FULLSCREEN (there will be visual bugs)
+- I made a Proof-of-concept project for finding seeds only using patterns and coords [here](https://github.com/ICshX/SeedFinderX)
 
 ## License
 This project is released under the MIT License. See `LICENSE` for details.
